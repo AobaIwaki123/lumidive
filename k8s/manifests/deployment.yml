@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lumidive
+  namespace: lumidive
+  labels:
+    app: lumidive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lumidive
+  template:
+    metadata:
+      labels:
+        app: lumidive
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      containers:
+        - name: lumidive
+          image: ghcr.io/aobaiwaki123/lumidive:latest
+          imagePullPolicy: IfNotPresent
+          args: ["server", "--port", "8080"]
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
