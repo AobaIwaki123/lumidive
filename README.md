@@ -1,76 +1,128 @@
 # lumidive
 
-TicketDive (ticketdive.com / t-dv.com) event metadata proxy, CLI, and iCalendar feed generator written in Go.
+TicketDive（チケットダイブ: ticketdive.com / t-dv.com）のイベント情報・チケット販売状況の解析プロキシ、CLIツール、およびカレンダー連携（iCalendar）サーバーです。
+
+Web UIが内包されており、ブラウザからURLを入力するだけで、イベントの開演時間・会場・出演グループ・チケット残席を即座に確認し、GoogleカレンダーやAppleカレンダーへワンクリックで登録できます。
 
 ---
 
-## Overview
+## 主な特徴
 
-lumidive provides high-performance, structured access to TicketDive events, ticket tiers, real-time availability/sold-out status, survey questions, and iCalendar (.ics) exports.
-
-### Key Capabilities
-
-- **URL and Short-Link Resolution**: Accepts full event URLs (`https://ticketdive.com/event/<id>`), official short URLs (`https://t-dv.com/<id>`), FC event URLs (`https://ticketdive.com/event/fc/<id>`), and bare event IDs.
-- **Deep Metadata Extraction**: Parses Next.js SSR hydration payloads (`__NEXT_DATA__`) into strongly-typed structures including event summaries, stages, schedules, artists, ticket categories, ticket prices, fees, real-time stock ratios, and questionnaire fields.
-- **High Throughput and Protection**: In-memory TTL caching with `singleflight` request coalescing to minimize upstream load.
-- **iCalendar (.ics) Feed**: Converts TicketDive schedules into RFC 5545 `.ics` feeds for Google Calendar and Apple Calendar integration.
-- **OpenAPI 3.0 Compliant**: Strictly typed REST API generated via `oapi-codegen`.
+- **誰でも使える Web UI**: ブラウザでアクセスし、TicketDiveのイベントURLまたはIDを入れるだけで、イベント詳細の閲覧とカレンダー連携URL（`.ics`）の発行が可能。
+- **各種URLの自動判別**:
+  - 通常URL: `https://ticketdive.com/event/<id>`
+  - 公式短縮URL: `https://t-dv.com/<id>`
+  - FC会員先行URL: `https://ticketdive.com/event/fc/<id>`
+  - イベントID直指定: `plkt1022` 等
+- **リッチなメタデータ抽出**: Next.jsのSSRデータ（`__NEXT_DATA__`）から、イベント概要、タイムテーブル、会場、出演者、全券種名、チケット定価・手数料、販売状況（販売中/完売/残りわずか）、アンケート選択肢などを構造化。
+- **カレンダー連携（iCalendar / RFC 5545）**: iPhone/MacのカレンダーアプリやGoogleカレンダーに登録可能な`.ics`形式を即時生成。
+- **高スループット & 多重リクエスト防止**: インメモリTTLキャッシュと `singleflight` による重複取得の合流処理を内包。
+- **軽量 & 安全**: 外部Node/フロントエンドビルド不要（Goの`embed`による単一バイナリ）、Distrolessコンテナ（約9MB）。
 
 ---
 
-## Installation and Quick Start
+## 使い方
 
-### Build from Source
+### 1. Webブラウザで使う（推奨）
+
+サーバー（[https://lumidive.aooba.net/](https://lumidive.aooba.net/)）を起動してブラウザでアクセスします。
+
+1. 入力欄に TicketDive のイベントURL（またはID）を貼り付け、「情報を取得」をクリック。
+2. イベント名、日時、会場、出演者、各チケットの在庫状況がプレビューされます。
+3. **カレンダー連携**:
+   - 「URLコピー」をクリックし、iPhoneのカレンダー「新規カレンダー購読」やGoogleカレンダーの「URLで追加」に貼り付けると、予定がカレンダーに自動登録されます。
+   - 「ダウンロード」をクリックして直接 `.ics` ファイルを保存することも可能です。
+
+---
+
+### 2. コマンドライン（CLI）で使う
 
 ```bash
-git clone https://github.com/AobaIwaki123/lumidive.git
-cd lumidive
-go build -o bin/lumidive ./cmd/lumidive
-```
+# イベント情報を解析してJSON形式で標準出力
+lumidive parse https://ticketdive.com/event/plkt1022
+lumidive parse t-dv.com/plkt1022
+lumidive parse plkt1022
 
-### CLI Usage
+# iCalendar (.ics) データを標準出力（ファイルに保存可能）
+lumidive ical plkt1022 > event.ics
 
-```bash
-# Parse event metadata and print JSON
-./bin/lumidive parse https://ticketdive.com/event/plkt1022
-
-# Parse via short URL or ID
-./bin/lumidive parse t-dv.com/plkt1022
-./bin/lumidive parse plkt1022
-
-# Generate iCalendar (.ics) feed to stdout
-./bin/lumidive ical plkt1022 > event.ics
-
-# Start API server
-./bin/lumidive server --port 8080 --cache-ttl 60s
+# Web UI & API サーバーの起動
+lumidive server --port 8080 --cache-ttl 60s
 ```
 
 ---
 
-## API Endpoints
+### 3. APIエンドポイント（開発者向け）
 
-| Method | Path | Description |
+| メソッド | パス | 説明 |
 |:---|:---|:---|
-| `GET` | `/healthz` | Health check |
-| `GET` | `/api/v1/events/{eventId}` | Fetch event metadata by ID or slug |
-| `GET` | `/api/v1/events?url={url}` | Fetch event metadata by URL query parameter |
-| `POST` | `/api/v1/events/parse` | Parse event by JSON payload (`{"url": "..."}` or `{"id": "..."}`) |
-| `GET` | `/api/v1/events/{eventId}/ical` | Get iCalendar (.ics) calendar feed |
+| `GET` | `/` | Web UI（ブラウザ向けダッシュボード） |
+| `GET` | `/healthz` | ヘルスチェック |
+| `GET` | `/api/v1/events/{eventId}` | イベントIDからメタデータを取得（JSON） |
+| `GET` | `/api/v1/events?url={url}` | URLパラメータからメタデータを取得（JSON） |
+| `POST` | `/api/v1/events/parse` | リクエストボディ（`{"url": "..."}`）からパース |
+| `POST` | `/api/v1/events/batch` | 複数イベントの一括パース |
+| `GET` | `/api/v1/events/{eventId}/ical` | iCalendar形式（.ics）でイベントを取得 |
 
----
-
-## Local Verification
-
-Run the strict local verification script before pushing or submitting PRs:
-
-```bash
-./scripts/verify-all.sh
+#### レスポンス例 (`GET /api/v1/events/plkt1022`)
+```json
+{
+  "apiVersion": "1.0",
+  "success": true,
+  "cached": true,
+  "data": {
+    "id": "drIPQl23ZVboh1BWQy6y",
+    "name": "2026/10/22(木) 「笑う門にはプリュきたる!! 」@WOMBLIVE",
+    "slug": "plkt1022",
+    "url": "https://ticketdive.com/event/plkt1022",
+    "stages": [
+      {
+        "openAt": "2026-10-22T06:15:00.000Z",
+        "startAt": "2026-10-22T06:45:00.000Z",
+        "venue": { "name": "WOMBLIVE" },
+        "artists": [
+          { "name": "ハニースパイスRe." },
+          { "name": "JAPANARIZM" }
+        ]
+      }
+    ],
+    "ticketGroups": [
+      {
+        "name": "一般販売",
+        "types": [
+          {
+            "name": "一般前方チケット",
+            "price": 4200,
+            "totalPrice": 4540,
+            "isSoldOut": false
+          }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-This validates code generation drift, runs `golangci-lint`, executes tests with `-race`, and builds all binaries.
+---
+
+## ビルド & 開発コマンド (Make)
+
+プロジェクトの定型コマンドは `Makefile` に集約されています：
+
+```bash
+make help          # 利用可能なコマンド一覧を表示
+make build         # バイナリを bin/lumidive にビルド
+make run           # ローカルサーバーをポート 8080 で起動
+make test          # -race フラグ付きユニット・インテグレーションテスト実行
+make lint          # golangci-lint による静的解析
+make verify        # フルローカル検証（スキーマドリフト・リント・テスト・ビルド）
+make generate      # OpenAPI コード生成および仕様ファイルの同期
+make docker-build  # ローカル Docker イメージのビルド
+make clean         # ビルド成果物および一時ファイルのクリーンアップ
+```
 
 ---
 
-## License
+## ライセンス
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License

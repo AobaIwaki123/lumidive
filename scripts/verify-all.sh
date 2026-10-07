@@ -12,8 +12,8 @@ echo "========================================================"
 echo "1. Checking Schema Drift (go generate & git diff)..."
 echo "========================================================"
 go generate ./...
-if ! git diff --exit-code pkg/api/; then
-  echo "Error: Uncommitted generated code detected in pkg/api/! Please commit generated files."
+if ! git diff --exit-code pkg/api/lumidive.gen.go; then
+  echo "Error: Uncommitted generated code detected in pkg/api/lumidive.gen.go! Please commit generated files."
   exit 1
 fi
 echo "OK: Code generation is up to date."

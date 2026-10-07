@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lumidive - TicketDive カレンダー連携 & イベント解析</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --accent: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 1.5rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .docs-link {
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .docs-link:hover {
+      color: var(--primary);
+      border-color: #bfdbfe;
+      background: #eff6ff;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 1.35rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    button {
+      padding: 0.75rem 1.25rem;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.15s;
+      white-space: nowrap;
+    }
+
+    button:hover { background: var(--primary-hover); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .samples {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .sample-btn {
+      background: none;
+      color: var(--primary);
+      border: none;
+      padding: 0;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .sample-btn:hover { color: var(--primary-hover); }
+
+    .error-box {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--danger);
+      padding: 0.65rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    /* Result Section */
+    .result-section { display: none; }
+
+    .event-header {
+      display: flex;
+      gap: 1rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .event-image {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      display: none;
+    }
+
+    .event-header-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .event-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      line-height: 1.4;
+    }
+
+    .event-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.25rem 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .event-meta dt { color: var(--text-muted); font-weight: 500; }
+    .event-meta dd { color: var(--text); }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.6rem;
+      margin: 1.15rem 0;
+    }
+
+    .action-card {
+      background: var(--accent);
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .action-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .action-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.15rem;
+    }
+
+    .action-url {
+      font-size: 0.825rem;
+      font-family: monospace;
+      color: #334155;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .action-btns {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .action-btn {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 600;
+      border-radius: 6px;
+    }
+
+    .action-btn:hover {
+      background: #f8fafc;
+      color: var(--primary);
+    }
+
+    .section-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 1rem 0 0.4rem;
+    }
+
+    .artists-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .artist-tag {
+      background: var(--accent);
+      color: #334155;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    .tickets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 0.35rem;
+    }
+
+    .tickets-table th, .tickets-table td {
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tickets-table th {
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-available { background: #dcfce7; color: var(--success); }
+    .status-soldout { background: #fee2e2; color: var(--danger); }
+
+    /* Features 3-columns Card */
+    .features-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.15rem 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 0.25rem;
+    }
+
+    .feature-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .feature-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-desc {
+      font-size: 0.775rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    @media (max-width: 540px) {
+      .features-card {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>lumidive</h1>
+        <span class="subtitle">TicketDive カレンダー連携</span>
+      </div>
+      <a href="/docs" class="docs-link" target="_blank" rel="noopener">API ドキュメント (/docs)</a>
+    </header>
+
+    <div class="card">
+      <div class="form-group">
+        <input type="text" id="targetInput" placeholder="URLまたはイベントID (例: plkt1022 または t-dv.com/rookeyfes2)" autofocus />
+        <button id="fetchBtn" onclick="handleFetch()">取得</button>
+      </div>
+      <div class="samples">
+        <span>例:</span>
+        <button type="button" class="sample-btn" onclick="setSample('plkt1022')">笑う門にはプリュきたる!!</button>
+        <span>·</span>
+        <button type="button" class="sample-btn" onclick="setSample('rookeyfes2')">ルキフェス</button>
+      </div>
+
+      <div id="errorBox" class="error-box"></div>
+    </div>
+
+    <div id="resultSection" class="result-section">
+      <div class="card">
+        <div class="event-header">
+          <img id="eventImage" class="event-image" alt="Event banner" />
+          <div class="event-header-info">
+            <div class="event-title" id="eventTitle">-</div>
+            <dl class="event-meta">
+              <dt>日時</dt>
+              <dd id="eventDateTime">-</dd>
+              <dt>会場</dt>
+              <dd id="eventVenue">-</dd>
+              <dt>公式</dt>
+              <dd><a id="eventUrl" href="#" target="_blank" rel="noopener">-</a></dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="actions-grid">
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-label">カレンダー連携 (.ics)</div>
+              <div class="action-url" id="icalUrlText">-</div>
+            </div>
+            <div class="action-btns">
+              <button class="action-btn" onclick="copyIcalUrl()">URLコピー</button>
+              <button class="action-btn" onclick="downloadIcal()">ダウンロード</button>
+            </div>
+          </div>
+
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-label">JSON API エンドポイント</div>
+              <div class="action-url" id="apiUrlText">-</div>
+            </div>
+            <div class="action-btns">
+              <button class="action-btn" onclick="copyApiUrl()">URLコピー</button>
+              <button class="action-btn" onclick="openApiJson()">開く</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-label">出演者</div>
+        <div class="artists-tags" id="artistsList"></div>
+
+        <div class="section-label">チケット状況</div>
+        <table class="tickets-table">
+          <thead>
+            <tr>
+              <th>券種</th>
+              <th>価格</th>
+              <th>状況</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="features-card">
+      <div class="feature-item">
+        <div class="feature-title">カレンダー自動同期</div>
+        <div class="feature-desc">発行されたURLをiPhoneやGoogleカレンダーに追加するだけで、開演や会場が自動登録されます。</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-title">チケット残席プレビュー</div>
+        <div class="feature-desc">前方・一般・最前オプションなどの販売ステータスや価格内訳を即座に確認できます。</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-title">開発者向け REST API</div>
+        <div class="feature-desc">OpenAPI 3.0準拠。Botや独自ツールからJSON/iCalを直接叩いて連携可能です。</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentEventId = '';
+
+    function setSample(val) {
+      document.getElementById('targetInput').value = val;
+      handleFetch();
+    }
+
+    async function handleFetch() {
+      const input = document.getElementById('targetInput').value.trim();
+      const errBox = document.getElementById('errorBox');
+      const resSec = document.getElementById('resultSection');
+      const fetchBtn = document.getElementById('fetchBtn');
+
+      errBox.style.display = 'none';
+      if (!input) {
+        showError('URL またはイベント ID を入力してください');
+        return;
+      }
+
+      fetchBtn.disabled = true;
+      fetchBtn.textContent = '取得中...';
+
+      try {
+        let apiUrl = '';
+        if (/^[a-zA-Z0-9_-]+$/.test(input)) {
+          apiUrl = `/api/v1/events/${encodeURIComponent(input)}`;
+        } else {
+          apiUrl = `/api/v1/events?url=${encodeURIComponent(input)}`;
+        }
+
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'イベント情報の取得に失敗しました');
+        }
+
+        renderEvent(data.data);
+        resSec.style.display = 'block';
+      } catch (err) {
+        showError(err.message || '通信エラーが発生しました');
+        resSec.style.display = 'none';
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = '取得';
+      }
+    }
+
+    function renderEvent(event) {
+      currentEventId = event.slug || event.id;
+
+      document.getElementById('eventTitle').textContent = event.name || '名称未定';
+      
+      const imgEl = document.getElementById('eventImage');
+      if (event.images && event.images.length > 0) {
+        imgEl.src = event.images[0];
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.style.display = 'none';
+      }
+
+      const stage = (event.stages && event.stages.length > 0) ? event.stages[0] : null;
+      let dateStr = '日時未定';
+      let venueStr = '会場未定';
+
+      if (stage) {
+        if (stage.startAt) {
+          const d = new Date(stage.startAt);
+          dateStr = d.toLocaleString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+          if (stage.openAt) {
+            const op = new Date(stage.openAt);
+            dateStr += ` (開場 ${op.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })})`;
+          }
+        }
+        if (stage.venue && stage.venue.name) {
+          venueStr = stage.venue.name;
+        } else if (stage.stageName) {
+          venueStr = stage.stageName;
+        }
+      }
+
+      document.getElementById('eventDateTime').textContent = dateStr;
+      document.getElementById('eventVenue').textContent = venueStr;
+
+      const linkA = document.getElementById('eventUrl');
+      linkA.href = event.url;
+      linkA.textContent = 'チケットページ ↗';
+
+      const icalUrl = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
+      const apiEndpoint = `${window.location.origin}/api/v1/events/${currentEventId}`;
+
+      document.getElementById('icalUrlText').textContent = icalUrl;
+      document.getElementById('apiUrlText').textContent = apiEndpoint;
+
+      // Artists
+      const artistsContainer = document.getElementById('artistsList');
+      artistsContainer.innerHTML = '';
+      if (stage && stage.artists && stage.artists.length > 0) {
+        stage.artists.forEach(a => {
+          const tag = document.createElement('span');
+          tag.className = 'artist-tag';
+          tag.textContent = a.name;
+          artistsContainer.appendChild(tag);
+        });
+      } else {
+        artistsContainer.innerHTML = '<span style="font-size:0.75rem;color:#94a3b8;">出演者情報なし</span>';
+      }
+
+      // Tickets
+      const ticketsBody = document.getElementById('ticketsBody');
+      ticketsBody.innerHTML = '';
+      if (event.ticketGroups && event.ticketGroups.length > 0) {
+        event.ticketGroups.forEach(g => {
+          if (g.types) {
+            g.types.forEach(t => {
+              const tr = document.createElement('tr');
+              const isSoldOut = t.isSoldOut || t.remainingRate === 0;
+              const statusBadge = isSoldOut 
+                ? '<span class="status-badge status-soldout">完売</span>' 
+                : '<span class="status-badge status-available">販売中</span>';
+
+              tr.innerHTML = `
+                <td><strong>${t.name}</strong> <span style="color:#64748b;font-size:0.75rem;">(${g.name})</span></td>
+                <td>¥${t.totalPrice || t.price}</td>
+                <td>${statusBadge}</td>
+              `;
+              ticketsBody.appendChild(tr);
+            });
+          }
+        });
+      } else {
+        ticketsBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">チケット情報なし</td></tr>';
+      }
+    }
+
+    function showError(msg) {
+      const errBox = document.getElementById('errorBox');
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
+
+    function copyIcalUrl() {
+      const url = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
+      navigator.clipboard.writeText(url).then(() => alert('カレンダー URL をコピーしました'));
+    }
+
+    function downloadIcal() {
+      window.open(`/api/v1/events/${currentEventId}/ical`, '_blank');
+    }
+
+    function copyApiUrl() {
+      const url = `${window.location.origin}/api/v1/events/${currentEventId}`;
+      navigator.clipboard.writeText(url).then(() => alert('API URL をコピーしました'));
+    }
+
+    function openApiJson() {
+      window.open(`/api/v1/events/${currentEventId}`, '_blank');
+    }
+
+    document.getElementById('targetInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleFetch();
+    });
+  </script>
+</body>
+</html>
