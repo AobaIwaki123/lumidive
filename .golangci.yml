@@ -1,0 +1,36 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - nilerr
+    - errorlint
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: package-comments
+        disabled: false
+      - name: unused-parameter
+        disabled: false
+
+issues:
+  exclude-rules:
+    - path: ".*\\.gen\\.go"
+      linters:
+        - revive
+        - errcheck
+        - unused
+    - path: "tools/tools\\.go"
+      linters:
+        - revive
+        - unused

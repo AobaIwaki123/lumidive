@@ -1,0 +1,7 @@
+package: api
+generate:
+  models: true
+  client: true
+  std-http-server: true
+  embedded-spec: true
+output: lumidive.gen.go

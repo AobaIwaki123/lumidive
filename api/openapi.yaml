@@ -1,0 +1,428 @@
+openapi: "3.0.3"
+info:
+  title: "lumidive API"
+  version: "1.0.0"
+  description: "TicketDive event adapter, metadata proxy, and iCalendar feed generator."
+  license:
+    name: "MIT"
+    url: "https://opensource.org/licenses/MIT"
+servers:
+  - url: "http://localhost:8080"
+    description: "Local development server"
+
+paths:
+  /healthz:
+    get:
+      summary: "Health Check"
+      description: "Returns health status of lumidive service."
+      operationId: "getHealth"
+      responses:
+        "200":
+          description: "Healthy"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/events/{eventId}:
+    get:
+      summary: "Get Event by ID"
+      description: "Fetches structured event metadata from TicketDive by event ID or slug."
+      operationId: "getEventById"
+      parameters:
+        - name: "eventId"
+          in: "path"
+          required: true
+          description: "TicketDive event ID or URL slug (e.g. plkt1022)"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Event details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+        "400":
+          description: "Invalid Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Event Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/events/{eventId}/ical:
+    get:
+      summary: "Get Event iCalendar Feed"
+      description: "Generates an iCalendar (.ics) file for the specified event."
+      operationId: "getEventIcal"
+      parameters:
+        - name: "eventId"
+          in: "path"
+          required: true
+          description: "TicketDive event ID or URL slug"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "iCalendar feed"
+          content:
+            text/calendar:
+              schema:
+                type: "string"
+        "404":
+          description: "Event Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/events:
+    get:
+      summary: "Get Event by URL Query"
+      description: "Fetches structured event metadata by specifying the event URL as a query parameter."
+      operationId: "getEventByUrl"
+      parameters:
+        - name: "url"
+          in: "query"
+          required: true
+          description: "TicketDive URL (full or shortened, e.g. https://ticketdive.com/event/plkt1022 or https://t-dv.com/plkt1022)"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "Event details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+        "400":
+          description: "Invalid Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/events/parse:
+    post:
+      summary: "Parse Event"
+      description: "Accepts a TicketDive URL or ID in the request body and returns structured metadata."
+      operationId: "parseEvent"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParseRequest"
+      responses:
+        "200":
+          description: "Event details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+        "400":
+          description: "Invalid Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: "object"
+      required:
+        - "status"
+        - "service"
+        - "timestamp"
+      properties:
+        status:
+          type: "string"
+          example: "ok"
+        service:
+          type: "string"
+          example: "lumidive"
+        timestamp:
+          type: "integer"
+          format: "int64"
+          example: 1791377890202
+
+    ParseRequest:
+      type: "object"
+      properties:
+        url:
+          type: "string"
+          description: "TicketDive event URL"
+          example: "https://ticketdive.com/event/plkt1022"
+        id:
+          type: "string"
+          description: "TicketDive event ID"
+          example: "plkt1022"
+
+    EventResponse:
+      type: "object"
+      required:
+        - "success"
+        - "cached"
+        - "data"
+      properties:
+        success:
+          type: "boolean"
+          example: true
+        cached:
+          type: "boolean"
+          example: false
+        data:
+          $ref: "#/components/schemas/Event"
+
+    Event:
+      type: "object"
+      required:
+        - "id"
+        - "slug"
+        - "name"
+        - "url"
+        - "shortUrl"
+      properties:
+        id:
+          type: "string"
+          description: "Internal event ID"
+          example: "drIPQl23ZVboh1BWQy6y"
+        slug:
+          type: "string"
+          description: "Event URL slug"
+          example: "plkt1022"
+        name:
+          type: "string"
+          description: "Event title"
+          example: "2026/10/22(木) 「笑う門にはプリュきたる!! 」@WOMBLIVE"
+        detail:
+          type: "string"
+          description: "Event description and notes"
+        release:
+          type: "string"
+          description: "Information release date"
+          example: "2026-09-28T13:00:00.000Z"
+        url:
+          type: "string"
+          description: "Canonical event URL"
+          example: "https://ticketdive.com/event/plkt1022"
+        shortUrl:
+          type: "string"
+          description: "Shortened event URL"
+          example: "https://t-dv.com/plkt1022"
+        stages:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Stage"
+        artists:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Artist"
+        ticketGroups:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/TicketGroup"
+        images:
+          type: "array"
+          items:
+            type: "string"
+          description: "Flyer image URLs"
+
+    Stage:
+      type: "object"
+      required:
+        - "id"
+        - "stageName"
+      properties:
+        id:
+          type: "string"
+          example: "RyL58qx8oMmAtzapdEZY"
+        stageName:
+          type: "string"
+          example: "WOMBLIVE"
+        startAt:
+          type: "string"
+          description: "Show start time"
+          example: "2026-10-22T06:45:00.000Z"
+        openAt:
+          type: "string"
+          description: "Doors open time"
+          example: "2026-10-22T06:15:00.000Z"
+        venue:
+          $ref: "#/components/schemas/Venue"
+        artists:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Artist"
+
+    Venue:
+      type: "object"
+      properties:
+        name:
+          type: "string"
+          example: "WOMBLIVE"
+        address:
+          type: "string"
+          example: ""
+
+    Artist:
+      type: "object"
+      required:
+        - "id"
+        - "name"
+      properties:
+        id:
+          type: "string"
+          example: "honeyspice-re"
+        name:
+          type: "string"
+          example: "ハニースパイスRe."
+
+    TicketGroup:
+      type: "object"
+      required:
+        - "id"
+        - "name"
+        - "receptionType"
+        - "types"
+      properties:
+        id:
+          type: "string"
+          example: "EHV68qpqSYQB2qdJGAji"
+        name:
+          type: "string"
+          description: "Group name (e.g. 一般販売, 最前OP 一般販売)"
+          example: "一般販売"
+        receptionType:
+          type: "string"
+          description: "Reception type (first=先着, lottery=抽選)"
+          example: "first"
+        startApply:
+          type: "string"
+          description: "Application start timestamp"
+          example: "2026-10-02T11:00:00.000Z"
+        endApply:
+          type: "string"
+          description: "Application end timestamp"
+          example: "2026-10-22T06:45:00.000Z"
+        paymentChannels:
+          type: "array"
+          items:
+            type: "string"
+          example: ["card", "konbini"]
+        customize:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/CustomizeQuestion"
+        status:
+          type: "string"
+          example: "applied"
+        types:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/TicketType"
+
+    CustomizeQuestion:
+      type: "object"
+      properties:
+        label:
+          type: "string"
+          example: "お目当ての出演者を教えてください（必須）"
+        required:
+          type: "boolean"
+          example: true
+        type:
+          type: "string"
+          example: "select"
+        options:
+          type: "array"
+          items:
+            type: "string"
+
+    TicketType:
+      type: "object"
+      required:
+        - "id"
+        - "name"
+        - "price"
+        - "isSoldOut"
+      properties:
+        id:
+          type: "string"
+          example: "5ekMbDP1Vhc1qgIt6etj"
+        name:
+          type: "string"
+          example: "一般前方チケット"
+        detail:
+          type: "string"
+          example: "ドリンク代別700円込み/6歳以上チケット必要"
+        price:
+          type: "integer"
+          example: 4200
+        fee:
+          type: "integer"
+          example: 340
+        remainingRate:
+          type: "number"
+          description: "Stock ratio (1 = remaining, 0 = sold out)"
+          example: 1.0
+        isSoldOut:
+          type: "boolean"
+          description: "Whether this ticket type is sold out"
+          example: false
+        status:
+          type: "string"
+          description: "Status string (applied, closed)"
+          example: "applied"
+        maxNumPerApply:
+          type: "integer"
+          description: "Maximum tickets per application"
+          example: 4
+        prefix:
+          type: "string"
+          description: "Ticket number prefix"
+          example: "IA"
+
+    ErrorResponse:
+      type: "object"
+      required:
+        - "success"
+        - "error"
+      properties:
+        success:
+          type: "boolean"
+          example: false
+        error:
+          type: "string"
+          example: "Event not found"
