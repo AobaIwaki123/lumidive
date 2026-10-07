@@ -105,34 +105,21 @@ lumidive server --port 8080 --cache-ttl 60s
 
 ---
 
-## インストール & ビルド
+## ビルド & 開発コマンド (Make)
 
-### Go でビルド
-```bash
-git clone https://github.com/AobaIwaki123/lumidive.git
-cd lumidive
-go build -o bin/lumidive ./cmd/lumidive
-```
-
-### Docker で起動
-```bash
-docker run -p 8080:8080 ghcr.io/aobaiwaki123/lumidive:latest
-```
-
----
-
-## 開発 & 品質検証
-
-コミットおよびPR作成前に、ローカル検証スクリプトを実行して品質を確認します：
+プロジェクトの定型コマンドは `Makefile` に集約されています：
 
 ```bash
-./scripts/verify-all.sh
+make help          # 利用可能なコマンド一覧を表示
+make build         # バイナリを bin/lumidive にビルド
+make run           # ローカルサーバーをポート 8080 で起動
+make test          # -race フラグ付きユニット・インテグレーションテスト実行
+make lint          # golangci-lint による静的解析
+make verify        # フルローカル検証（スキーマドリフト・リント・テスト・ビルド）
+make generate      # OpenAPI コード生成および仕様ファイルの同期
+make docker-build  # ローカル Docker イメージのビルド
+make clean         # ビルド成果物および一時ファイルのクリーンアップ
 ```
-
-- OpenAPI コード生成差分の検知（スキーマドリフト防止）
-- `golangci-lint` による静的解析
-- `-race` フラグ付きユニット・インテグレーションテスト
-- 全パッケージ・バイナリのコンパイル検証
 
 ---
 
