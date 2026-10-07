@@ -121,6 +121,9 @@ func runServer(args []string) {
 	apiServer := server.NewServer(service)
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", server.HandleIndex)
+	mux.HandleFunc("GET /openapi.yaml", server.HandleOpenAPISpec)
+	mux.HandleFunc("GET /docs", server.HandleDocs)
 	handler := api.HandlerFromMux(apiServer, mux)
 
 	// Wrap with basic CORS middleware

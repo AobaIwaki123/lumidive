@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lumidive - TicketDive カレンダー連携 & イベント解析</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #ea580c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+
+    .top-nav {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .nav-link {
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
+    }
+
+    .nav-link:hover {
+      color: var(--primary);
+      border-color: #bfdbfe;
+      background: #eff6ff;
+    }
+
+    h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.025em;
+      margin-bottom: 0.35rem;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    button {
+      padding: 0.75rem 1.25rem;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.15s;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .samples {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .sample-btn {
+      background: #eff6ff;
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .sample-btn:hover {
+      background: #dbeafe;
+    }
+
+    .error-box {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--danger);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .result-section {
+      display: none;
+    }
+
+    .event-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .event-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .event-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.35rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .event-meta dt {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .event-meta dd {
+      color: var(--text);
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+    }
+
+    .action-card {
+      background: #f1f5f9;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .action-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .action-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 0.15rem;
+    }
+
+    .action-url {
+      font-size: 0.85rem;
+      font-family: monospace;
+      color: #334155;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .action-btn {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      background: #ffffff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .action-btn:hover {
+      background: #f8fafc;
+      color: var(--primary);
+    }
+
+    .artists-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+    }
+
+    .artist-tag {
+      background: #f1f5f9;
+      color: #334155;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .tickets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .tickets-table th, .tickets-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tickets-table th {
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-available { background: #dcfce7; color: var(--success); }
+    .status-soldout { background: #fee2e2; color: var(--danger); }
+
+    /* Guide Section */
+    .guide-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .guide-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+
+    .guide-item {
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .guide-step {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 0.25rem;
+    }
+
+    .guide-item h4 {
+      font-size: 0.9rem;
+      margin-bottom: 0.35rem;
+      color: var(--text);
+    }
+
+    .guide-item p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .dev-banner {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .dev-banner-text {
+      color: #334155;
+    }
+
+    .dev-banner-btn {
+      background: var(--primary);
+      color: #fff;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      text-decoration: none;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .dev-banner-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: auto;
+      padding-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    footer a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-nav">
+      <a href="/docs" class="nav-link" target="_blank" rel="noopener">
+        <span>📖 API Docs (Scalar)</span>
+      </a>
+      <a href="/openapi.yaml" class="nav-link" target="_blank" rel="noopener">
+        <span>⚙️ openapi.yaml</span>
+      </a>
+      <a href="https://github.com/AobaIwaki123/lumidive" class="nav-link" target="_blank" rel="noopener">
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <header>
+      <h1>lumidive</h1>
+      <p class="subtitle">TicketDive（チケットダイブ）イベント解析 & カレンダー連携ツール</p>
+    </header>
+
+    <div class="card">
+      <div class="form-group">
+        <input type="text" id="targetInput" placeholder="URLまたはイベントID (例: plkt1022 または t-dv.com/plkt1022)" autofocus />
+        <button id="fetchBtn" onclick="handleFetch()">情報を取得</button>
+      </div>
+      <div class="samples">
+        <span>例:</span>
+        <button type="button" class="sample-btn" onclick="setSample('plkt1022')">plkt1022</button>
+        <button type="button" class="sample-btn" onclick="setSample('https://t-dv.com/plkt1022')">短縮URL</button>
+      </div>
+
+      <div id="errorBox" class="error-box"></div>
+    </div>
+
+    <div id="resultSection" class="result-section">
+      <div class="card">
+        <div class="event-header">
+          <div class="event-title" id="eventTitle">-</div>
+          <dl class="event-meta">
+            <dt>開催日時</dt>
+            <dd id="eventDateTime">-</dd>
+            <dt>会場</dt>
+            <dd id="eventVenue">-</dd>
+            <dt>元リンク</dt>
+            <dd><a id="eventUrl" href="#" target="_blank" rel="noopener">-</a></dd>
+          </dl>
+        </div>
+
+        <h4 style="font-size: 0.9rem; margin-bottom: 0.25rem;">ワンクリック連携</h4>
+        <div class="actions-grid">
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-label">Google / Apple カレンダー (.ics)</div>
+              <div class="action-url" id="icalUrlText">-</div>
+            </div>
+            <button class="action-btn" onclick="copyIcalUrl()">URLコピー</button>
+            <button class="action-btn" onclick="downloadIcal()">ダウンロード</button>
+          </div>
+
+          <div class="action-card">
+            <div class="action-info">
+              <div class="action-label">JSON API エンドポイント</div>
+              <div class="action-url" id="apiUrlText">-</div>
+            </div>
+            <button class="action-btn" onclick="copyApiUrl()">API URLコピー</button>
+            <button class="action-btn" onclick="openApiJson()">JSONを開く</button>
+          </div>
+        </div>
+
+        <h4 style="font-size: 0.9rem; margin: 1rem 0 0.25rem;">出演アーティスト</h4>
+        <div class="artists-tags" id="artistsList"></div>
+
+        <h4 style="font-size: 0.9rem; margin: 1.25rem 0 0.25rem;">チケット販売状況</h4>
+        <table class="tickets-table">
+          <thead>
+            <tr>
+              <th>券種名</th>
+              <th>価格</th>
+              <th>状況</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="guide-card">
+      <div class="guide-title">
+        <span>使い方ガイド</span>
+      </div>
+      <div class="guide-grid">
+        <div class="guide-item">
+          <div class="guide-step">STEP 1</div>
+          <h4>URL を入力</h4>
+          <p>TicketDive の公演ページURL（通常URL、短縮URL、またはイベントID）を上の入力欄に貼り付けます。</p>
+        </div>
+        <div class="guide-item">
+          <div class="guide-step">STEP 2</div>
+          <h4>残席 & 詳細を確認</h4>
+          <p>開場・開演時間、会場場所、出演グループ、各チケット券種（前方・一般・最前OPなど）の販売状況が即時表示されます。</p>
+        </div>
+        <div class="guide-item">
+          <div class="guide-step">STEP 3</div>
+          <h4>カレンダーに登録</h4>
+          <p>「URLコピー」を押し、iPhone カレンダーの「カレンダー購読」や Google カレンダーの「URLで追加」に貼り付けると自動登録されます。</p>
+        </div>
+      </div>
+
+      <div class="dev-banner">
+        <div class="dev-banner-text">
+          <strong>開発者の方へ:</strong> OpenAPI 3.0 仕様に準拠した REST API を提供しています。Bot や独自ツールから直接 JSON / iCal を利用可能です。
+        </div>
+        <a href="/docs" class="dev-banner-btn" target="_blank" rel="noopener">API 仕様を見る (Scalar) →</a>
+      </div>
+    </div>
+
+    <footer>
+      <a href="/docs" target="_blank" rel="noopener">API ドキュメント (/docs)</a>
+      <span>·</span>
+      <a href="/openapi.yaml" target="_blank" rel="noopener">OpenAPI 仕様 (/openapi.yaml)</a>
+      <span>·</span>
+      <a href="https://github.com/AobaIwaki123/lumidive" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+  </div>
+
+  <script>
+    let currentEventId = '';
+    let currentEvent = null;
+
+    function setSample(val) {
+      document.getElementById('targetInput').value = val;
+      handleFetch();
+    }
+
+    async function handleFetch() {
+      const input = document.getElementById('targetInput').value.trim();
+      const errBox = document.getElementById('errorBox');
+      const resSec = document.getElementById('resultSection');
+      const fetchBtn = document.getElementById('fetchBtn');
+
+      errBox.style.display = 'none';
+      if (!input) {
+        showError('URL またはイベント ID を入力してください');
+        return;
+      }
+
+      fetchBtn.disabled = true;
+      fetchBtn.textContent = '取得中...';
+
+      try {
+        let apiUrl = '';
+        if (/^[a-zA-Z0-9_-]+$/.test(input)) {
+          apiUrl = `/api/v1/events/${encodeURIComponent(input)}`;
+        } else {
+          apiUrl = `/api/v1/events?url=${encodeURIComponent(input)}`;
+        }
+
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'イベント情報の取得に失敗しました');
+        }
+
+        renderEvent(data.data);
+        resSec.style.display = 'block';
+      } catch (err) {
+        showError(err.message || '通信エラーが発生しました');
+        resSec.style.display = 'none';
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = '情報を取得';
+      }
+    }
+
+    function renderEvent(event) {
+      currentEvent = event;
+      currentEventId = event.slug || event.id;
+
+      document.getElementById('eventTitle').textContent = event.name || '名称未定';
+      
+      const stage = (event.stages && event.stages.length > 0) ? event.stages[0] : null;
+      let dateStr = '日時未定';
+      let venueStr = '会場未定';
+
+      if (stage) {
+        if (stage.startAt) {
+          const d = new Date(stage.startAt);
+          dateStr = d.toLocaleString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+          if (stage.openAt) {
+            const op = new Date(stage.openAt);
+            dateStr += ` (開場 ${op.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })})`;
+          }
+        }
+        if (stage.venue && stage.venue.name) {
+          venueStr = stage.venue.name;
+        } else if (stage.stageName) {
+          venueStr = stage.stageName;
+        }
+      }
+
+      document.getElementById('eventDateTime').textContent = dateStr;
+      document.getElementById('eventVenue').textContent = venueStr;
+
+      const linkA = document.getElementById('eventUrl');
+      linkA.href = event.url;
+      linkA.textContent = event.url;
+
+      const icalUrl = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
+      const apiEndpoint = `${window.location.origin}/api/v1/events/${currentEventId}`;
+
+      document.getElementById('icalUrlText').textContent = icalUrl;
+      document.getElementById('apiUrlText').textContent = apiEndpoint;
+
+      // Render Artists
+      const artistsContainer = document.getElementById('artistsList');
+      artistsContainer.innerHTML = '';
+      if (stage && stage.artists && stage.artists.length > 0) {
+        stage.artists.forEach(a => {
+          const tag = document.createElement('span');
+          tag.className = 'artist-tag';
+          tag.textContent = a.name;
+          artistsContainer.appendChild(tag);
+        });
+      } else {
+        artistsContainer.innerHTML = '<span style="font-size:0.8rem;color:#94a3b8;">出演者情報なし</span>';
+      }
+
+      // Render Tickets
+      const ticketsBody = document.getElementById('ticketsBody');
+      ticketsBody.innerHTML = '';
+      if (event.ticketGroups && event.ticketGroups.length > 0) {
+        event.ticketGroups.forEach(g => {
+          if (g.types) {
+            g.types.forEach(t => {
+              const tr = document.createElement('tr');
+              const isSoldOut = t.isSoldOut || t.remainingRate === 0;
+              const statusBadge = isSoldOut 
+                ? '<span class="status-badge status-soldout">完売</span>' 
+                : '<span class="status-badge status-available">販売中</span>';
+
+              tr.innerHTML = `
+                <td><strong>${t.name}</strong><br><small style="color:#64748b;">${g.name}</small></td>
+                <td>¥${t.totalPrice || t.price}</td>
+                <td>${statusBadge}</td>
+              `;
+              ticketsBody.appendChild(tr);
+            });
+          }
+        });
+      } else {
+        ticketsBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">チケット情報なし</td></tr>';
+      }
+    }
+
+    function showError(msg) {
+      const errBox = document.getElementById('errorBox');
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
+
+    function copyIcalUrl() {
+      const url = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
+      navigator.clipboard.writeText(url).then(() => alert('カレンダー連携 URL をコピーしました！'));
+    }
+
+    function downloadIcal() {
+      const url = `/api/v1/events/${currentEventId}/ical`;
+      window.open(url, '_blank');
+    }
+
+    function copyApiUrl() {
+      const url = `${window.location.origin}/api/v1/events/${currentEventId}`;
+      navigator.clipboard.writeText(url).then(() => alert('API URL をコピーしました！'));
+    }
+
+    function openApiJson() {
+      const url = `/api/v1/events/${currentEventId}`;
+      window.open(url, '_blank');
+    }
+
+    document.getElementById('targetInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleFetch();
+    });
+  </script>
+</body>
+</html>
