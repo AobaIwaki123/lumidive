@@ -15,6 +15,7 @@
       --border: #e2e8f0;
       --success: #16a34a;
       --danger: #dc2626;
+      --accent: #f1f5f9;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,10 +34,9 @@
 
     .container {
       width: 100%;
-      max-width: 620px;
+      max-width: 640px;
     }
 
-    /* Minimal Header */
     header {
       display: flex;
       align-items: center;
@@ -51,24 +51,25 @@
     }
 
     h1 {
-      font-size: 1.35rem;
+      font-size: 1.4rem;
       font-weight: 700;
       letter-spacing: -0.02em;
     }
 
     .subtitle {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
     }
 
     .docs-link {
-      font-size: 0.8rem;
+      font-size: 0.825rem;
       color: var(--text-muted);
       text-decoration: none;
       border: 1px solid var(--border);
       background: #fff;
-      padding: 0.25rem 0.6rem;
+      padding: 0.3rem 0.75rem;
       border-radius: 6px;
+      font-weight: 500;
       transition: all 0.15s;
     }
 
@@ -80,11 +81,11 @@
 
     .card {
       background: var(--card-bg);
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid var(--border);
-      padding: 1.25rem;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-      margin-bottom: 1rem;
+      padding: 1.35rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+      margin-bottom: 1.25rem;
     }
 
     .form-group {
@@ -95,27 +96,27 @@
 
     input[type="text"] {
       flex: 1;
-      padding: 0.65rem 0.85rem;
-      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
       border: 1px solid var(--border);
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
 
     input[type="text"]:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
 
     button {
-      padding: 0.65rem 1rem;
+      padding: 0.75rem 1.25rem;
       background: var(--primary);
       color: #fff;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       transition: background-color 0.15s;
       white-space: nowrap;
@@ -150,24 +151,42 @@
       background: #fef2f2;
       border: 1px solid #fecaca;
       color: var(--danger);
-      padding: 0.6rem 0.85rem;
+      padding: 0.65rem 0.9rem;
       border-radius: 6px;
       font-size: 0.85rem;
       margin-top: 0.75rem;
     }
 
+    /* Result Section */
     .result-section { display: none; }
 
     .event-header {
+      display: flex;
+      gap: 1rem;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 0.75rem;
-      margin-bottom: 0.75rem;
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .event-image {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      display: none;
+    }
+
+    .event-header-info {
+      flex: 1;
+      min-width: 0;
     }
 
     .event-title {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       font-weight: 700;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.4rem;
       line-height: 1.4;
     }
 
@@ -178,20 +197,20 @@
       font-size: 0.85rem;
     }
 
-    .event-meta dt { color: var(--text-muted); }
+    .event-meta dt { color: var(--text-muted); font-weight: 500; }
     .event-meta dd { color: var(--text); }
 
     .actions-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.5rem;
-      margin: 1rem 0;
+      gap: 0.6rem;
+      margin: 1.15rem 0;
     }
 
     .action-card {
-      background: #f1f5f9;
-      padding: 0.65rem 0.85rem;
-      border-radius: 6px;
+      background: var(--accent);
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -207,11 +226,11 @@
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-muted);
-      margin-bottom: 0.1rem;
+      margin-bottom: 0.15rem;
     }
 
     .action-url {
-      font-size: 0.8rem;
+      font-size: 0.825rem;
       font-family: monospace;
       color: #334155;
       overflow: hidden;
@@ -221,17 +240,17 @@
 
     .action-btns {
       display: flex;
-      gap: 0.35rem;
+      gap: 0.4rem;
     }
 
     .action-btn {
-      padding: 0.35rem 0.65rem;
-      font-size: 0.75rem;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
       background: #ffffff;
       color: var(--text);
       border: 1px solid var(--border);
       font-weight: 600;
-      border-radius: 4px;
+      border-radius: 6px;
     }
 
     .action-btn:hover {
@@ -240,35 +259,35 @@
     }
 
     .section-label {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
-      margin: 0.85rem 0 0.35rem;
+      margin: 1rem 0 0.4rem;
     }
 
     .artists-tags {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.3rem;
+      gap: 0.35rem;
     }
 
     .artist-tag {
-      background: #f1f5f9;
+      background: var(--accent);
       color: #334155;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
     }
 
     .tickets-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.8rem;
-      margin-top: 0.25rem;
+      font-size: 0.85rem;
+      margin-top: 0.35rem;
     }
 
     .tickets-table th, .tickets-table td {
-      padding: 0.4rem 0.6rem;
+      padding: 0.5rem 0.65rem;
       text-align: left;
       border-bottom: 1px solid var(--border);
     }
@@ -281,25 +300,50 @@
 
     .status-badge {
       display: inline-block;
-      padding: 0.1rem 0.35rem;
+      padding: 0.15rem 0.45rem;
       border-radius: 4px;
-      font-size: 0.7rem;
+      font-size: 0.75rem;
       font-weight: 600;
     }
 
     .status-available { background: #dcfce7; color: var(--success); }
     .status-soldout { background: #fee2e2; color: var(--danger); }
 
-    /* Compact Usage Tips */
-    .tips {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      padding: 0 0.25rem;
-      line-height: 1.6;
+    /* Features 3-columns Card */
+    .features-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.15rem 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 0.25rem;
     }
 
-    .tips ol {
-      padding-left: 1.25rem;
+    .feature-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .feature-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-desc {
+      font-size: 0.775rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    @media (max-width: 540px) {
+      .features-card {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
     }
   </style>
 </head>
@@ -310,19 +354,19 @@
         <h1>lumidive</h1>
         <span class="subtitle">TicketDive カレンダー連携</span>
       </div>
-      <a href="/docs" class="docs-link" target="_blank" rel="noopener">API Specs (/docs)</a>
+      <a href="/docs" class="docs-link" target="_blank" rel="noopener">API ドキュメント (/docs)</a>
     </header>
 
     <div class="card">
       <div class="form-group">
-        <input type="text" id="targetInput" placeholder="URLまたはイベントID (例: plkt1022)" autofocus />
+        <input type="text" id="targetInput" placeholder="URLまたはイベントID (例: plkt1022 または t-dv.com/rookeyfes2)" autofocus />
         <button id="fetchBtn" onclick="handleFetch()">取得</button>
       </div>
       <div class="samples">
         <span>例:</span>
-        <button type="button" class="sample-btn" onclick="setSample('plkt1022')">plkt1022</button>
+        <button type="button" class="sample-btn" onclick="setSample('plkt1022')">笑う門にはプリュきたる!!</button>
         <span>·</span>
-        <button type="button" class="sample-btn" onclick="setSample('https://t-dv.com/plkt1022')">短縮URL</button>
+        <button type="button" class="sample-btn" onclick="setSample('rookeyfes2')">ルキフェス</button>
       </div>
 
       <div id="errorBox" class="error-box"></div>
@@ -331,15 +375,18 @@
     <div id="resultSection" class="result-section">
       <div class="card">
         <div class="event-header">
-          <div class="event-title" id="eventTitle">-</div>
-          <dl class="event-meta">
-            <dt>日時</dt>
-            <dd id="eventDateTime">-</dd>
-            <dt>会場</dt>
-            <dd id="eventVenue">-</dd>
-            <dt>公式</dt>
-            <dd><a id="eventUrl" href="#" target="_blank" rel="noopener">-</a></dd>
-          </dl>
+          <img id="eventImage" class="event-image" alt="Event banner" />
+          <div class="event-header-info">
+            <div class="event-title" id="eventTitle">-</div>
+            <dl class="event-meta">
+              <dt>日時</dt>
+              <dd id="eventDateTime">-</dd>
+              <dt>会場</dt>
+              <dd id="eventVenue">-</dd>
+              <dt>公式</dt>
+              <dd><a id="eventUrl" href="#" target="_blank" rel="noopener">-</a></dd>
+            </dl>
+          </div>
         </div>
 
         <div class="actions-grid">
@@ -356,7 +403,7 @@
 
           <div class="action-card">
             <div class="action-info">
-              <div class="action-label">JSON API</div>
+              <div class="action-label">JSON API エンドポイント</div>
               <div class="action-url" id="apiUrlText">-</div>
             </div>
             <div class="action-btns">
@@ -383,11 +430,19 @@
       </div>
     </div>
 
-    <div class="tips">
-      <ol>
-        <li>URLまたはイベントIDを入力して「取得」を押します。</li>
-        <li>カレンダーURLをコピーし、iPhone（カレンダー照会/購読）やGoogleカレンダー（URLで追加）に登録すると自動同期されます。</li>
-      </ol>
+    <div class="features-card">
+      <div class="feature-item">
+        <div class="feature-title">カレンダー自動同期</div>
+        <div class="feature-desc">発行されたURLをiPhoneやGoogleカレンダーに追加するだけで、開演や会場が自動登録されます。</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-title">チケット残席プレビュー</div>
+        <div class="feature-desc">前方・一般・最前オプションなどの販売ステータスや価格内訳を即座に確認できます。</div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-title">開発者向け REST API</div>
+        <div class="feature-desc">OpenAPI 3.0準拠。Botや独自ツールからJSON/iCalを直接叩いて連携可能です。</div>
+      </div>
     </div>
   </div>
 
@@ -445,6 +500,14 @@
 
       document.getElementById('eventTitle').textContent = event.name || '名称未定';
       
+      const imgEl = document.getElementById('eventImage');
+      if (event.images && event.images.length > 0) {
+        imgEl.src = event.images[0];
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.style.display = 'none';
+      }
+
       const stage = (event.stages && event.stages.length > 0) ? event.stages[0] : null;
       let dateStr = '日時未定';
       let venueStr = '会場未定';
