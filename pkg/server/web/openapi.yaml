@@ -101,6 +101,83 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/artists/{artistId}:
+    get:
+      summary: "Get Artist Profile and Events"
+      description: "Fetches structured artist profile metadata and scheduled upcoming/active events from TicketDive by artist slug or ID."
+      operationId: "getArtistById"
+      parameters:
+        - name: "artistId"
+          in: "path"
+          required: true
+          description: "TicketDive artist ID or URL slug (e.g. yoruami)"
+          schema:
+            type: "string"
+        - name: "refresh"
+          in: "query"
+          required: false
+          description: "Bypass cache and force refresh from upstream"
+          schema:
+            type: "boolean"
+            default: false
+      responses:
+        "200":
+          description: "Artist details and related events"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistDetailResponse"
+        "400":
+          description: "Invalid Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Artist Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/artists/{artistId}/ical:
+    get:
+      summary: "Get Artist iCalendar Feed"
+      description: "Generates an aggregated RFC 5545 iCalendar feed for all scheduled events of the specified artist."
+      operationId: "getArtistIcal"
+      parameters:
+        - name: "artistId"
+          in: "path"
+          required: true
+          description: "TicketDive artist ID or URL slug (e.g. yoruami)"
+          schema:
+            type: "string"
+      responses:
+        "200":
+          description: "iCalendar feed of artist events"
+          content:
+            text/calendar:
+              schema:
+                type: "string"
+        "404":
+          description: "Artist Not Found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/events:
     get:
       summary: "Get Event by URL Query"
@@ -308,6 +385,98 @@ components:
           $ref: "#/components/schemas/SourceMetadata"
         data:
           $ref: "#/components/schemas/Event"
+
+    ArtistDetailResponse:
+      type: "object"
+      required:
+        - "apiVersion"
+        - "success"
+        - "cached"
+        - "data"
+      properties:
+        apiVersion:
+          type: "string"
+          example: "1.0"
+        success:
+          type: "boolean"
+          example: true
+        cached:
+          type: "boolean"
+          example: false
+        cachedAt:
+          type: "string"
+          format: "date-time"
+        source:
+          $ref: "#/components/schemas/SourceMetadata"
+        data:
+          $ref: "#/components/schemas/ArtistDetail"
+
+    ArtistDetail:
+      type: "object"
+      required:
+        - "id"
+        - "name"
+      properties:
+        id:
+          type: "string"
+          description: "Artist slug or ID"
+          example: "yoruami"
+        name:
+          type: "string"
+          description: "Artist display name"
+          example: "夜光性アミューズ"
+        profileImage:
+          type: "string"
+          description: "Artist profile avatar image URL"
+        twitterAccount:
+          type: "string"
+          description: "Official Twitter / X account handle"
+          example: "Yoruamiofficial"
+        url:
+          type: "string"
+          description: "Official TicketDive artist page URL"
+          example: "https://ticketdive.com/artist/yoruami"
+        events:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/ArtistEvent"
+        metadata:
+          type: "object"
+          additionalProperties: true
+
+    ArtistEvent:
+      type: "object"
+      required:
+        - "id"
+        - "title"
+      properties:
+        id:
+          type: "string"
+          description: "Event ID"
+        slug:
+          type: "string"
+          description: "Event slug URL identifier"
+        title:
+          type: "string"
+          description: "Event title"
+        url:
+          type: "string"
+          description: "Event URL on TicketDive"
+        imageSource:
+          type: "string"
+          description: "Event flyer/banner thumbnail URL"
+        startAt:
+          type: "string"
+          description: "Event start or stage date (ISO 8601)"
+        endAt:
+          type: "string"
+          description: "Event end date if specified"
+        venueName:
+          type: "string"
+          description: "Venue name"
+        salesStatus:
+          type: "string"
+          description: "Current sales status (applied, closed, etc.)"
 
     BatchEventResult:
       type: "object"

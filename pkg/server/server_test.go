@@ -19,10 +19,14 @@ type mockTransport struct {
 	statusCode   int
 }
 
-func (m *mockTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
+func (m *mockTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	body := m.responseBody
+	if strings.Contains(r.URL.Path, "/artist/") {
+		body = mockArtistHTML
+	}
 	return &http.Response{
 		StatusCode: m.statusCode,
-		Body:       io.NopCloser(strings.NewReader(m.responseBody)),
+		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     make(http.Header),
 	}, nil
 }
@@ -51,6 +55,36 @@ const mockHTML = `<!DOCTYPE html><html><head>
             "ticketInfoList": []
           },
           "eventImages": []
+        }
+      }
+    }
+  }
+}
+</script>
+</head><body></body></html>`
+
+const mockArtistHTML = `<!DOCTYPE html><html><head>
+<script id="__NEXT_DATA__" type="application/json">
+{
+  "props": {
+    "pageProps": {
+      "__superjsonProps": {
+        "json": {
+          "artist": {
+            "id": "yoruami",
+            "name": "夜光性アミューズ",
+            "twitterAccount": "Yoruamiofficial"
+          },
+          "artistRelatedEntryNow": [
+            {
+              "id": "ev_1",
+              "url": "chomyojo_1007",
+              "title": "超 明星現象 2026",
+              "startEventDate": "2026-10-06T15:00:00.000Z",
+              "venueName": "Spotify O-EAST",
+              "salesStatus": "applied"
+            }
+          ]
         }
       }
     }
@@ -205,4 +239,55 @@ func TestBatchParseEvents(t *testing.T) {
 		t.Errorf("expected result 0 to succeed")
 	}
 }
+
+func TestGetArtistById(t *testing.T) {
+	handler := setupTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/artists/yoruami", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp api.ArtistDetailResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode json: %v", err)
+	}
+
+	if !resp.Success {
+		t.Errorf("expected success true")
+	}
+	if resp.Data.Id != "yoruami" {
+		t.Errorf("expected artist ID yoruami, got %s", resp.Data.Id)
+	}
+	if resp.Data.Name != "夜光性アミューズ" {
+		t.Errorf("expected artist name 夜光性アミューズ, got %s", resp.Data.Name)
+	}
+	if resp.Data.Events == nil || len(*resp.Data.Events) != 1 {
+		t.Fatalf("expected 1 event, got %v", resp.Data.Events)
+	}
+}
+
+func TestGetArtistIcal(t *testing.T) {
+	handler := setupTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/artists/yoruami/ical", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "BEGIN:VCALENDAR") {
+		t.Errorf("expected iCal format, got:\n%s", body)
+	}
+	if !strings.Contains(body, "超 明星現象 2026") {
+		t.Errorf("expected event title in iCal, got:\n%s", body)
+	}
+}
+
 

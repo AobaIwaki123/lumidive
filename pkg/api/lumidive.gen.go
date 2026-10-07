@@ -32,6 +32,69 @@ type Artist struct {
 	Url *string `json:"url,omitempty"`
 }
 
+// ArtistDetail defines model for ArtistDetail.
+type ArtistDetail struct {
+	Events *[]ArtistEvent `json:"events,omitempty"`
+
+	// Id Artist slug or ID
+	Id       string                  `json:"id"`
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+
+	// Name Artist display name
+	Name string `json:"name"`
+
+	// ProfileImage Artist profile avatar image URL
+	ProfileImage *string `json:"profileImage,omitempty"`
+
+	// TwitterAccount Official Twitter / X account handle
+	TwitterAccount *string `json:"twitterAccount,omitempty"`
+
+	// Url Official TicketDive artist page URL
+	Url *string `json:"url,omitempty"`
+}
+
+// ArtistDetailResponse defines model for ArtistDetailResponse.
+type ArtistDetailResponse struct {
+	ApiVersion string       `json:"apiVersion"`
+	Cached     bool         `json:"cached"`
+	CachedAt   *time.Time   `json:"cachedAt,omitempty"`
+	Data       ArtistDetail `json:"data"`
+
+	// Source Upstream source provenance and platform details
+	Source  *SourceMetadata `json:"source,omitempty"`
+	Success bool            `json:"success"`
+}
+
+// ArtistEvent defines model for ArtistEvent.
+type ArtistEvent struct {
+	// EndAt Event end date if specified
+	EndAt *string `json:"endAt,omitempty"`
+
+	// Id Event ID
+	Id string `json:"id"`
+
+	// ImageSource Event flyer/banner thumbnail URL
+	ImageSource *string `json:"imageSource,omitempty"`
+
+	// SalesStatus Current sales status (applied, closed, etc.)
+	SalesStatus *string `json:"salesStatus,omitempty"`
+
+	// Slug Event slug URL identifier
+	Slug *string `json:"slug,omitempty"`
+
+	// StartAt Event start or stage date (ISO 8601)
+	StartAt *string `json:"startAt,omitempty"`
+
+	// Title Event title
+	Title string `json:"title"`
+
+	// Url Event URL on TicketDive
+	Url *string `json:"url,omitempty"`
+
+	// VenueName Venue name
+	VenueName *string `json:"venueName,omitempty"`
+}
+
 // BatchEventResponse defines model for BatchEventResponse.
 type BatchEventResponse struct {
 	ApiVersion string             `json:"apiVersion"`
@@ -299,6 +362,12 @@ type Venue struct {
 	Url *string `json:"url,omitempty"`
 }
 
+// GetArtistByIdParams defines parameters for GetArtistById.
+type GetArtistByIdParams struct {
+	// Refresh Bypass cache and force refresh from upstream
+	Refresh *bool `form:"refresh,omitempty" json:"refresh,omitempty"`
+}
+
 // GetEventByUrlParams defines parameters for GetEventByUrl.
 type GetEventByUrlParams struct {
 	// Url TicketDive URL (full or shortened, e.g. https://ticketdive.com/event/plkt1022 or https://t-dv.com/plkt1022)
@@ -393,6 +462,12 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetArtistById request
+	GetArtistById(ctx context.Context, artistId string, params *GetArtistByIdParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetArtistIcal request
+	GetArtistIcal(ctx context.Context, artistId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetEventByUrl request
 	GetEventByUrl(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -414,6 +489,30 @@ type ClientInterface interface {
 
 	// GetHealth request
 	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetArtistById(ctx context.Context, artistId string, params *GetArtistByIdParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetArtistByIdRequest(c.Server, artistId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetArtistIcal(ctx context.Context, artistId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetArtistIcalRequest(c.Server, artistId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GetEventByUrl(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -510,6 +609,96 @@ func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetArtistByIdRequest generates requests for GetArtistById
+func NewGetArtistByIdRequest(server string, artistId string, params *GetArtistByIdParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "artistId", runtime.ParamLocationPath, artistId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/artists/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Refresh != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "refresh", runtime.ParamLocationQuery, *params.Refresh); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetArtistIcalRequest generates requests for GetArtistIcal
+func NewGetArtistIcalRequest(server string, artistId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "artistId", runtime.ParamLocationPath, artistId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/artists/%s/ical", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetEventByUrlRequest generates requests for GetEventByUrl
@@ -813,6 +1002,12 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetArtistByIdWithResponse request
+	GetArtistByIdWithResponse(ctx context.Context, artistId string, params *GetArtistByIdParams, reqEditors ...RequestEditorFn) (*GetArtistByIdResponse, error)
+
+	// GetArtistIcalWithResponse request
+	GetArtistIcalWithResponse(ctx context.Context, artistId string, reqEditors ...RequestEditorFn) (*GetArtistIcalResponse, error)
+
 	// GetEventByUrlWithResponse request
 	GetEventByUrlWithResponse(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*GetEventByUrlResponse, error)
 
@@ -834,6 +1029,54 @@ type ClientWithResponsesInterface interface {
 
 	// GetHealthWithResponse request
 	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
+}
+
+type GetArtistByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ArtistDetailResponse
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetArtistByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetArtistByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetArtistIcalResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetArtistIcalResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetArtistIcalResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type GetEventByUrlResponse struct {
@@ -978,6 +1221,24 @@ func (r GetHealthResponse) StatusCode() int {
 	return 0
 }
 
+// GetArtistByIdWithResponse request returning *GetArtistByIdResponse
+func (c *ClientWithResponses) GetArtistByIdWithResponse(ctx context.Context, artistId string, params *GetArtistByIdParams, reqEditors ...RequestEditorFn) (*GetArtistByIdResponse, error) {
+	rsp, err := c.GetArtistById(ctx, artistId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetArtistByIdResponse(rsp)
+}
+
+// GetArtistIcalWithResponse request returning *GetArtistIcalResponse
+func (c *ClientWithResponses) GetArtistIcalWithResponse(ctx context.Context, artistId string, reqEditors ...RequestEditorFn) (*GetArtistIcalResponse, error) {
+	rsp, err := c.GetArtistIcal(ctx, artistId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetArtistIcalResponse(rsp)
+}
+
 // GetEventByUrlWithResponse request returning *GetEventByUrlResponse
 func (c *ClientWithResponses) GetEventByUrlWithResponse(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*GetEventByUrlResponse, error) {
 	rsp, err := c.GetEventByUrl(ctx, params, reqEditors...)
@@ -1046,6 +1307,86 @@ func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEdit
 		return nil, err
 	}
 	return ParseGetHealthResponse(rsp)
+}
+
+// ParseGetArtistByIdResponse parses an HTTP response from a GetArtistByIdWithResponse call
+func ParseGetArtistByIdResponse(rsp *http.Response) (*GetArtistByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetArtistByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ArtistDetailResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetArtistIcalResponse parses an HTTP response from a GetArtistIcalWithResponse call
+func ParseGetArtistIcalResponse(rsp *http.Response) (*GetArtistIcalResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetArtistIcalResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetEventByUrlResponse parses an HTTP response from a GetEventByUrlWithResponse call
@@ -1276,6 +1617,12 @@ func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get Artist Profile and Events
+	// (GET /api/v1/artists/{artistId})
+	GetArtistById(w http.ResponseWriter, r *http.Request, artistId string, params GetArtistByIdParams)
+	// Get Artist iCalendar Feed
+	// (GET /api/v1/artists/{artistId}/ical)
+	GetArtistIcal(w http.ResponseWriter, r *http.Request, artistId string)
 	// Get Event by URL Query
 	// (GET /api/v1/events)
 	GetEventByUrl(w http.ResponseWriter, r *http.Request, params GetEventByUrlParams)
@@ -1304,6 +1651,67 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetArtistById operation middleware
+func (siw *ServerInterfaceWrapper) GetArtistById(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "artistId" -------------
+	var artistId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "artistId", r.PathValue("artistId"), &artistId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "artistId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetArtistByIdParams
+
+	// ------------- Optional query parameter "refresh" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "refresh", r.URL.Query(), &params.Refresh)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "refresh", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetArtistById(w, r, artistId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetArtistIcal operation middleware
+func (siw *ServerInterfaceWrapper) GetArtistIcal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "artistId" -------------
+	var artistId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "artistId", r.PathValue("artistId"), &artistId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "artistId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetArtistIcal(w, r, artistId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetEventByUrl operation middleware
 func (siw *ServerInterfaceWrapper) GetEventByUrl(w http.ResponseWriter, r *http.Request) {
@@ -1570,6 +1978,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/artists/{artistId}", wrapper.GetArtistById)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/artists/{artistId}/ical", wrapper.GetArtistIcal)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/events", wrapper.GetEventByUrl)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/events/batch", wrapper.BatchParseEvents)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/events/parse", wrapper.ParseEvent)

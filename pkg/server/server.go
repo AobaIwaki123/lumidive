@@ -37,6 +37,60 @@ func (s *Server) GetHealth(w http.ResponseWriter, _ *http.Request) {
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
+// GetArtistById fetches artist profile and events by artist slug or ID.
+// (GET /api/v1/artists/{artistId})
+func (s *Server) GetArtistById(w http.ResponseWriter, r *http.Request, artistID string, params api.GetArtistByIdParams) {
+	if artistID == "" {
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "artist ID is required", nil)
+		return
+	}
+
+	refresh := false
+	if params.Refresh != nil {
+		refresh = *params.Refresh
+	}
+
+	artist, cached, source, cachedAt, err := s.service.GetArtist(r.Context(), artistID, refresh)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, api.ArtistDetailResponse{
+		ApiVersion: currentAPIVersion,
+		Success:    true,
+		Cached:     cached,
+		CachedAt:   cachedAt,
+		Source:     source,
+		Data:       *artist,
+	})
+}
+
+// GetArtistIcal returns an aggregated iCalendar feed of all events for the artist.
+// (GET /api/v1/artists/{artistId}/ical)
+func (s *Server) GetArtistIcal(w http.ResponseWriter, r *http.Request, artistID string) {
+	if artistID == "" {
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "artist ID is required", nil)
+		return
+	}
+
+	artist, _, _, _, err := s.service.GetArtist(r.Context(), artistID, false)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
+		return
+	}
+
+	calData, err := ticketdive.GenerateArtistICal(artist)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "ICAL_ERROR", err.Error(), nil)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(calData))
+}
+
 // GetEventById fetches event metadata by event ID.
 // (GET /api/v1/events/{eventId})
 func (s *Server) GetEventById(w http.ResponseWriter, r *http.Request, eventID string, params api.GetEventByIdParams) {

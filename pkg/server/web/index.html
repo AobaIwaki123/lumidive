@@ -367,6 +367,8 @@
         <button type="button" class="sample-btn" onclick="setSample('plkt1022')">笑う門にはプリュきたる!!</button>
         <span>·</span>
         <button type="button" class="sample-btn" onclick="setSample('rookeyfes2')">ルキフェス</button>
+        <span>·</span>
+        <button type="button" class="sample-btn" onclick="setSample('https://ticketdive.com/artist/yoruami')">夜光性アミューズ(出演全公演)</button>
       </div>
 
       <div id="errorBox" class="error-box"></div>
@@ -454,6 +456,14 @@
       handleFetch();
     }
 
+    let currentMode = 'event'; // 'event' or 'artist'
+    let currentId = '';
+
+    function setSample(val) {
+      document.getElementById('targetInput').value = val;
+      handleFetch();
+    }
+
     async function handleFetch() {
       const input = document.getElementById('targetInput').value.trim();
       const errBox = document.getElementById('errorBox');
@@ -462,7 +472,7 @@
 
       errBox.style.display = 'none';
       if (!input) {
-        showError('URL またはイベント ID を入力してください');
+        showError('URL またはイベント/アーティスト ID を入力してください');
         return;
       }
 
@@ -471,7 +481,12 @@
 
       try {
         let apiUrl = '';
-        if (/^[a-zA-Z0-9_-]+$/.test(input)) {
+        const isArtist = input.includes('/artist/');
+        if (isArtist) {
+          const parts = input.split('/');
+          const artistId = parts[parts.length - 1] || parts[parts.length - 2];
+          apiUrl = `/api/v1/artists/${encodeURIComponent(artistId)}`;
+        } else if (/^[a-zA-Z0-9_-]+$/.test(input)) {
           apiUrl = `/api/v1/events/${encodeURIComponent(input)}`;
         } else {
           apiUrl = `/api/v1/events?url=${encodeURIComponent(input)}`;
@@ -481,10 +496,14 @@
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-          throw new Error(data.error || 'イベント情報の取得に失敗しました');
+          throw new Error(data.error || '情報の取得に失敗しました');
         }
 
-        renderEvent(data.data);
+        if (isArtist) {
+          renderArtist(data.data);
+        } else {
+          renderEvent(data.data);
+        }
         resSec.style.display = 'block';
       } catch (err) {
         showError(err.message || '通信エラーが発生しました');
@@ -495,8 +514,84 @@
       }
     }
 
+    function renderArtist(artist) {
+      currentMode = 'artist';
+      currentId = artist.id;
+
+      document.getElementById('eventTitle').textContent = `${artist.name} (出演予定公演一覧)`;
+
+      const imgEl = document.getElementById('eventImage');
+      if (artist.profileImage) {
+        imgEl.src = artist.profileImage;
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.style.display = 'none';
+      }
+
+      document.getElementById('eventDateTime').textContent = `現在受付中/公開中の公演: ${artist.events ? artist.events.length : 0}件`;
+      document.getElementById('eventVenue').textContent = artist.twitterAccount ? `@${artist.twitterAccount}` : '-';
+
+      const linkA = document.getElementById('eventUrl');
+      linkA.href = artist.url || `https://ticketdive.com/artist/${artist.id}`;
+      linkA.textContent = 'アーティストページ ↗';
+
+      const icalUrl = `${window.location.origin}/api/v1/artists/${currentId}/ical`;
+      const apiEndpoint = `${window.location.origin}/api/v1/artists/${currentId}`;
+
+      document.getElementById('icalUrlText').textContent = icalUrl;
+      document.getElementById('apiUrlText').textContent = apiEndpoint;
+
+      document.querySelector('.section-label').textContent = '出演グループ名';
+      const artistsContainer = document.getElementById('artistsList');
+      artistsContainer.innerHTML = `<span class="artist-tag">${artist.name}</span>`;
+
+      // Render scheduled events in the table
+      const ticketsLabel = document.querySelectorAll('.section-label')[1];
+      if (ticketsLabel) ticketsLabel.textContent = '出演イベント一覧';
+
+      const thead = document.querySelector('.tickets-table thead tr');
+      if (thead) {
+        thead.innerHTML = `
+          <th>公演名 / 会場</th>
+          <th>開催日時</th>
+          <th>状況</th>
+        `;
+      }
+
+      const tbody = document.getElementById('ticketsBody');
+      tbody.innerHTML = '';
+      if (artist.events && artist.events.length > 0) {
+        artist.events.forEach(ev => {
+          const tr = document.createElement('tr');
+          const isSoldOut = ev.salesStatus === 'closed';
+          const statusBadge = isSoldOut 
+            ? '<span class="status-badge status-soldout">受付終了</span>' 
+            : '<span class="status-badge status-available">受付中</span>';
+
+          let dateStr = '日時未定';
+          if (ev.startAt) {
+            const d = new Date(ev.startAt);
+            dateStr = d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+          }
+
+          tr.innerHTML = `
+            <td>
+              <a href="${ev.url}" target="_blank" rel="noopener" style="color:var(--text);font-weight:600;text-decoration:none;">${ev.title}</a>
+              <br><small style="color:#64748b;">${ev.venueName || '-'}</small>
+            </td>
+            <td>${dateStr}</td>
+            <td>${statusBadge}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">出演予定イベントがありません</td></tr>';
+      }
+    }
+
     function renderEvent(event) {
-      currentEventId = event.slug || event.id;
+      currentMode = 'event';
+      currentId = event.slug || event.id;
 
       document.getElementById('eventTitle').textContent = event.name || '名称未定';
       
@@ -535,13 +630,13 @@
       linkA.href = event.url;
       linkA.textContent = 'チケットページ ↗';
 
-      const icalUrl = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
-      const apiEndpoint = `${window.location.origin}/api/v1/events/${currentEventId}`;
+      const icalUrl = `${window.location.origin}/api/v1/events/${currentId}/ical`;
+      const apiEndpoint = `${window.location.origin}/api/v1/events/${currentId}`;
 
       document.getElementById('icalUrlText').textContent = icalUrl;
       document.getElementById('apiUrlText').textContent = apiEndpoint;
 
-      // Artists
+      document.querySelector('.section-label').textContent = '出演者';
       const artistsContainer = document.getElementById('artistsList');
       artistsContainer.innerHTML = '';
       if (stage && stage.artists && stage.artists.length > 0) {
@@ -555,7 +650,18 @@
         artistsContainer.innerHTML = '<span style="font-size:0.75rem;color:#94a3b8;">出演者情報なし</span>';
       }
 
-      // Tickets
+      const ticketsLabel = document.querySelectorAll('.section-label')[1];
+      if (ticketsLabel) ticketsLabel.textContent = 'チケット状況';
+
+      const thead = document.querySelector('.tickets-table thead tr');
+      if (thead) {
+        thead.innerHTML = `
+          <th>券種</th>
+          <th>価格</th>
+          <th>状況</th>
+        `;
+      }
+
       const ticketsBody = document.getElementById('ticketsBody');
       ticketsBody.innerHTML = '';
       if (event.ticketGroups && event.ticketGroups.length > 0) {
@@ -589,21 +695,25 @@
     }
 
     function copyIcalUrl() {
-      const url = `${window.location.origin}/api/v1/events/${currentEventId}/ical`;
+      const path = currentMode === 'artist' ? `/api/v1/artists/${currentId}/ical` : `/api/v1/events/${currentId}/ical`;
+      const url = `${window.location.origin}${path}`;
       navigator.clipboard.writeText(url).then(() => alert('カレンダー URL をコピーしました'));
     }
 
     function downloadIcal() {
-      window.open(`/api/v1/events/${currentEventId}/ical`, '_blank');
+      const path = currentMode === 'artist' ? `/api/v1/artists/${currentId}/ical` : `/api/v1/events/${currentId}/ical`;
+      window.open(path, '_blank');
     }
 
     function copyApiUrl() {
-      const url = `${window.location.origin}/api/v1/events/${currentEventId}`;
+      const path = currentMode === 'artist' ? `/api/v1/artists/${currentId}` : `/api/v1/events/${currentId}`;
+      const url = `${window.location.origin}${path}`;
       navigator.clipboard.writeText(url).then(() => alert('API URL をコピーしました'));
     }
 
     function openApiJson() {
-      window.open(`/api/v1/events/${currentEventId}`, '_blank');
+      const path = currentMode === 'artist' ? `/api/v1/artists/${currentId}` : `/api/v1/events/${currentId}`;
+      window.open(path, '_blank');
     }
 
     document.getElementById('targetInput').addEventListener('keydown', (e) => {

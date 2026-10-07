@@ -46,6 +46,14 @@ func TestNormalizeInput(t *testing.T) {
 			wantErr:      false,
 		},
 		{
+			name:         "Artist URL",
+			input:        "https://ticketdive.com/artist/yoruami",
+			expectedID:   "yoruami",
+			expectedCan:  "https://ticketdive.com/artist/yoruami",
+			expectedShrt: "https://ticketdive.com/artist/yoruami",
+			wantErr:      false,
+		},
+		{
 			name:    "Empty input",
 			input:   "   ",
 			wantErr: true,

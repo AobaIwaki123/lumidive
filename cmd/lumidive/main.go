@@ -58,22 +58,42 @@ func printUsage() {
 
 func runParse(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Error: missing event URL or ID")
+		fmt.Fprintln(os.Stderr, "Error: missing event/artist URL or ID")
 		fmt.Fprintln(os.Stderr, "Usage: lumidive parse <url-or-id>")
 		os.Exit(1)
 	}
 
 	target := args[0]
+	norm, err := ticketdive.NormalizeTarget(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	client := ticketdive.NewClient()
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+
+	if norm.Kind == ticketdive.KindArtist {
+		res, err := client.FetchArtist(context.Background(), target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if err := enc.Encode(res.Artist); err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	res, err := client.FetchEvent(context.Background(), target)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
 	if err := enc.Encode(res.Event); err != nil {
 		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
 		os.Exit(1)
@@ -82,12 +102,34 @@ func runParse(args []string) {
 
 func runICal(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Error: missing event URL or ID")
+		fmt.Fprintln(os.Stderr, "Error: missing event/artist URL or ID")
+		fmt.Fprintln(os.Stderr, "Usage: lumidive ical <url-or-id>")
 		os.Exit(1)
 	}
 
 	target := args[0]
+	norm, err := ticketdive.NormalizeTarget(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	client := ticketdive.NewClient()
+	if norm.Kind == ticketdive.KindArtist {
+		res, err := client.FetchArtist(context.Background(), target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		cal, err := ticketdive.GenerateArtistICal(res.Artist)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating iCal: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Print(cal)
+		return
+	}
+
 	res, err := client.FetchEvent(context.Background(), target)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

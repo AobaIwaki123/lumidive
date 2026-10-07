@@ -92,3 +92,46 @@ func (c *Client) FetchEvent(ctx context.Context, rawInput string) (*ParseResult,
 
 	return ParseHTML(string(body), norm)
 }
+
+// FetchArtist fetches an artist profile and their events by artist slug or URL.
+func (c *Client) FetchArtist(ctx context.Context, rawInput string) (*ArtistParseResult, error) {
+	norm, err := NormalizeTarget(rawInput)
+	if err != nil {
+		return nil, err
+	}
+	if norm.Kind != KindArtist {
+		// If input was given as a plain ID, treat it as artist target
+		norm.Kind = KindArtist
+		norm.TargetURL = fmt.Sprintf("https://ticketdive.com/artist/%s", norm.ID)
+		norm.CanonicalURL = norm.TargetURL
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, norm.TargetURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "ja,en-US;q=0.9,en;q=0.8")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch %s: %w", norm.TargetURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("artist not found (HTTP 404)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected upstream HTTP status: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return ParseArtistHTML(string(body), norm)
+}
