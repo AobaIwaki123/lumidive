@@ -29,6 +29,29 @@ type rawSuperJSON struct {
 	EventImages []struct {
 		ImageSource string `json:"imageSource"`
 	} `json:"eventImages"`
+	Artist                 *rawArtistProfile       `json:"artist"`
+	ArtistRelatedEntryNow  []rawArtistRelatedEvent `json:"artistRelatedEntryNow"`
+}
+
+type rawArtistProfile struct {
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Search         *string `json:"search"`
+	ProfileImage   *string `json:"profileImage"`
+	TwitterAccount *string `json:"twitterAccount"`
+	UpdatedAt      *string `json:"updatedAt"`
+}
+
+type rawArtistRelatedEvent struct {
+	ID               string  `json:"id"`
+	URL              string  `json:"url"`
+	Title            string  `json:"title"`
+	ImageSource      *string `json:"imageSource"`
+	StartEventDate   *string `json:"startEventDate"`
+	EndEventDate     *string `json:"endEventDate"`
+	DisplayStageDate *string `json:"displayStageDate"`
+	VenueName        *string `json:"venueName"`
+	SalesStatus      *string `json:"salesStatus"`
 }
 
 type rawEventDetail struct {
@@ -103,6 +126,12 @@ type ParseResult struct {
 	Source *api.SourceMetadata
 }
 
+// ArtistParseResult holds the parsed artist profile and their scheduled events.
+type ArtistParseResult struct {
+	Artist *api.ArtistDetail
+	Source *api.SourceMetadata
+}
+
 // ParseHTML parses TicketDive event HTML and returns a ParseResult.
 func ParseHTML(html string, norm *NormalizedURL) (*ParseResult, error) {
 	match := nextDataRegex.FindStringSubmatch(html)
@@ -134,6 +163,70 @@ func ParseHTML(html string, norm *NormalizedURL) (*ParseResult, error) {
 
 	return &ParseResult{
 		Event:  event,
+		Source: source,
+	}, nil
+}
+
+// ParseArtistHTML parses TicketDive artist page HTML and returns an ArtistParseResult.
+func ParseArtistHTML(html string, norm *NormalizedURL) (*ArtistParseResult, error) {
+	match := nextDataRegex.FindStringSubmatch(html)
+	if len(match) < 2 {
+		return nil, fmt.Errorf("could not find __NEXT_DATA__ in response HTML")
+	}
+
+	var data rawNextData
+	if err := json.Unmarshal([]byte(match[1]), &data); err != nil {
+		return nil, fmt.Errorf("failed to parse __NEXT_DATA__ json: %w", err)
+	}
+
+	superJSON := data.Props.PageProps.SuperJSONProps.JSON
+	if superJSON.Artist == nil {
+		return nil, fmt.Errorf("artist profile not found in page data")
+	}
+
+	artistURL := fmt.Sprintf("https://ticketdive.com/artist/%s", superJSON.Artist.ID)
+	eventsList := make([]api.ArtistEvent, 0, len(superJSON.ArtistRelatedEntryNow))
+	for _, rawEv := range superJSON.ArtistRelatedEntryNow {
+		evURL := fmt.Sprintf("https://ticketdive.com/event/%s", rawEv.URL)
+		slug := rawEv.URL
+		startAt := rawEv.DisplayStageDate
+		if startAt == nil {
+			startAt = rawEv.StartEventDate
+		}
+		eventsList = append(eventsList, api.ArtistEvent{
+			Id:          rawEv.ID,
+			Slug:        &slug,
+			Title:       rawEv.Title,
+			Url:         &evURL,
+			ImageSource: rawEv.ImageSource,
+			StartAt:     startAt,
+			EndAt:       rawEv.EndEventDate,
+			VenueName:   rawEv.VenueName,
+			SalesStatus: rawEv.SalesStatus,
+		})
+	}
+
+	artistDetail := &api.ArtistDetail{
+		Id:             superJSON.Artist.ID,
+		Name:           superJSON.Artist.Name,
+		ProfileImage:   superJSON.Artist.ProfileImage,
+		TwitterAccount: superJSON.Artist.TwitterAccount,
+		Url:            &artistURL,
+		Events:         &eventsList,
+	}
+
+	platform := "ticketdive"
+	now := time.Now().UTC()
+	source := &api.SourceMetadata{
+		Platform:   &platform,
+		Url:        &norm.CanonicalURL,
+		BuildId:    &data.BuildID,
+		FetchedAt:  &now,
+		ServerTime: &data.Props.PageProps.ServerTime,
+	}
+
+	return &ArtistParseResult{
+		Artist: artistDetail,
 		Source: source,
 	}, nil
 }

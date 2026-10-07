@@ -43,8 +43,12 @@ lumidive parse https://ticketdive.com/event/plkt1022
 lumidive parse t-dv.com/plkt1022
 lumidive parse plkt1022
 
-# iCalendar (.ics) データを標準出力（ファイルに保存可能）
+# アーティスト情報＆出演予定イベント一覧を解析（JSON）
+lumidive parse https://ticketdive.com/artist/yoruami
+
+# iCalendar (.ics) データを標準出力（イベント単体 or アーティスト全公演）
 lumidive ical plkt1022 > event.ics
+lumidive ical https://ticketdive.com/artist/yoruami > artist.ics
 
 # Web UI & API サーバーの起動
 lumidive server --port 8080 --cache-ttl 60s
@@ -63,6 +67,8 @@ lumidive server --port 8080 --cache-ttl 60s
 | `POST` | `/api/v1/events/parse` | リクエストボディ（`{"url": "..."}`）からパース |
 | `POST` | `/api/v1/events/batch` | 複数イベントの一括パース |
 | `GET` | `/api/v1/events/{eventId}/ical` | iCalendar形式（.ics）でイベントを取得 |
+| `GET` | `/api/v1/artists/{artistId}` | アーティスト情報＆出演予定イベント一覧を取得（JSON） |
+| `GET` | `/api/v1/artists/{artistId}/ical` | アーティストの全出演予定イベントをiCal配信（.ics） |
 
 #### レスポンス例 (`GET /api/v1/events/plkt1022`)
 ```json
