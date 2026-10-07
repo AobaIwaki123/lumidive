@@ -8,4 +8,4 @@ resources:
 
 images:
   - name: ghcr.io/aobaiwaki123/lumidive
-    newTag: latest
+    newTag: sha-cc9898e
