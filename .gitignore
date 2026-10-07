@@ -1,0 +1,14 @@
+# Binaries
+bin/
+dist/
+/lumidive
+
+# Test & Coverage
+coverage.out
+*.test
+
+# OS & Editor
+.DS_Store
+.vscode/
+.idea/
+*.swp

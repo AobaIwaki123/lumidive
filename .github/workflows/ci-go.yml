@@ -1,0 +1,94 @@
+name: CI - Go
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'api/**'
+      - '.golangci.yml'
+      - '.github/workflows/ci-go.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'api/**'
+      - '.golangci.yml'
+      - '.github/workflows/ci-go.yml'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+          cache: false
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    name: Test & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+          cache: false
+
+      - name: Verify Code Generation (Schema Drift Check)
+        run: |
+          go generate ./...
+          git diff --exit-code
+
+      - name: Run Unit & Integration Tests
+        run: |
+          go test -race -v -coverprofile=coverage.out ./...
+
+      - name: Upload Coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+  build:
+    name: Build Binaries
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+          cache: false
+
+      - name: Compile and verify all packages
+        run: |
+          go build -v ./...
+          go build -o /dev/null ./cmd/lumidive
