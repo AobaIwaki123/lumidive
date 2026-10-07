@@ -4,23 +4,26 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
+    paths-ignore:
+      - 'k8s/manifests/kustomization.yml'
+      - '**.md'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
   build-and-push:
-    name: Build & Push Container Image
+    name: Build, Push Image & Bump GitOps Tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -35,21 +38,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Normalize Repository Name to Lowercase
-        id: repo
-        run: |
-          IMAGE_NAME="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          echo "image=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: Determine Docker Tags
+      - name: Normalize Repository Name and Compute Tags
         id: meta
         run: |
-          IMAGE="${{ steps.repo.outputs.image }}"
-          TAGS="${IMAGE}:latest"
+          IMAGE_NAME="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG_SHA="sha-${SHORT_SHA}"
+          
+          TAGS="${IMAGE_NAME}:latest,${IMAGE_NAME}:${TAG_SHA}"
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF_NAME}"
-            TAGS="${TAGS},${IMAGE}:${VERSION}"
+            TAGS="${TAGS},${IMAGE_NAME}:${VERSION}"
           fi
+          
+          echo "image=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=${TAG_SHA}" >> "$GITHUB_OUTPUT"
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Docker Image
@@ -62,3 +66,24 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update k8s Image Tag in Kustomization
+        id: bump
+        run: |
+          TAG_SHA="${{ steps.meta.outputs.tag_sha }}"
+          echo "Updating k8s/manifests/kustomization.yml to newTag: ${TAG_SHA}"
+          
+          sed -i.bak -E "s/(newTag: ).*/\1${TAG_SHA}/" k8s/manifests/kustomization.yml
+          rm -f k8s/manifests/kustomization.yml.bak
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add k8s/manifests/kustomization.yml
+          if git diff --staged --quiet; then
+            echo "No change in kustomization.yml image tag. Skipping commit."
+          else
+            git commit -m "chore(k8s): bump image tag to ${TAG_SHA} [skip ci]"
+            git push origin main
+            echo "Pushed updated kustomization.yml to main with tag ${TAG_SHA}"
+          fi
