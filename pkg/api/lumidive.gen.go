@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
@@ -24,20 +25,65 @@ import (
 
 // Artist defines model for Artist.
 type Artist struct {
-	Id   string `json:"id"`
+	// Id Artist slug or ID
+	Id       string                  `json:"id"`
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+
+	// Name Artist display name
 	Name string `json:"name"`
+
+	// Url Profile or TicketDive artist URL
+	Url *string `json:"url,omitempty"`
+}
+
+// BatchEventResponse defines model for BatchEventResponse.
+type BatchEventResponse struct {
+	ApiVersion string             `json:"apiVersion"`
+	Results    []BatchEventResult `json:"results"`
+	Success    bool               `json:"success"`
+}
+
+// BatchEventResult defines model for BatchEventResult.
+type BatchEventResult struct {
+	// Error Error message if parsing this target failed
+	Error   *string `json:"error,omitempty"`
+	Event   *Event  `json:"event,omitempty"`
+	Success bool    `json:"success"`
+
+	// Target Requested target URL or ID
+	Target string `json:"target"`
+}
+
+// BatchParseRequest defines model for BatchParseRequest.
+type BatchParseRequest struct {
+	// Refresh Bypass cache and force refresh
+	Refresh *bool `json:"refresh,omitempty"`
+
+	// Targets List of event URLs or IDs to parse
+	Targets []string `json:"targets"`
 }
 
 // CustomizeQuestion defines model for CustomizeQuestion.
 type CustomizeQuestion struct {
-	Label    *string   `json:"label,omitempty"`
-	Options  *[]string `json:"options,omitempty"`
-	Required *bool     `json:"required,omitempty"`
-	Type     *string   `json:"type,omitempty"`
+	Id       *string                 `json:"id,omitempty"`
+	Label    *string                 `json:"label,omitempty"`
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+	Options  *[]string               `json:"options,omitempty"`
+	Required *bool                   `json:"required,omitempty"`
+	Type     *string                 `json:"type,omitempty"`
 }
 
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
+	ApiVersion string `json:"apiVersion"`
+
+	// Code Machine-readable error classification code
+	Code *string `json:"code,omitempty"`
+
+	// Details Additional diagnostic information or validation errors
+	Details *[]string `json:"details,omitempty"`
+
+	// Error Human-readable error description
 	Error   string `json:"error"`
 	Success bool   `json:"success"`
 }
@@ -49,11 +95,14 @@ type Event struct {
 	// Detail Event description and notes
 	Detail *string `json:"detail,omitempty"`
 
-	// Id Internal event ID
+	// Id Internal event ID (e.g. Firestore document ID)
 	Id string `json:"id"`
 
-	// Images Flyer image URLs
+	// Images Flyer and banner image URLs
 	Images *[]string `json:"images,omitempty"`
+
+	// Metadata Extensible dictionary for future or platform-specific attributes
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
 	// Name Event title
 	Name string `json:"name"`
@@ -64,9 +113,12 @@ type Event struct {
 	// ShortUrl Shortened event URL
 	ShortUrl string `json:"shortUrl"`
 
-	// Slug Event URL slug
-	Slug         string         `json:"slug"`
-	Stages       *[]Stage       `json:"stages,omitempty"`
+	// Slug Event URL slug identifier
+	Slug   string   `json:"slug"`
+	Stages *[]Stage `json:"stages,omitempty"`
+
+	// Stats Aggregated statistical indicators for the event
+	Stats        *EventStats    `json:"stats,omitempty"`
 	TicketGroups *[]TicketGroup `json:"ticketGroups,omitempty"`
 
 	// Url Canonical event URL
@@ -75,9 +127,34 @@ type Event struct {
 
 // EventResponse defines model for EventResponse.
 type EventResponse struct {
-	Cached  bool  `json:"cached"`
-	Data    Event `json:"data"`
-	Success bool  `json:"success"`
+	ApiVersion string `json:"apiVersion"`
+	Cached     bool   `json:"cached"`
+
+	// CachedAt Timestamp when the cache entry was created
+	CachedAt *time.Time `json:"cachedAt,omitempty"`
+	Data     Event      `json:"data"`
+
+	// Source Upstream source provenance and platform details
+	Source  *SourceMetadata `json:"source,omitempty"`
+	Success bool            `json:"success"`
+}
+
+// EventStats Aggregated statistical indicators for the event
+type EventStats struct {
+	// HasAvailableTickets Whether at least one ticket type remains available
+	HasAvailableTickets *bool `json:"hasAvailableTickets,omitempty"`
+
+	// MaxPrice Highest available ticket price
+	MaxPrice *int `json:"maxPrice,omitempty"`
+
+	// MinPrice Lowest available ticket price
+	MinPrice *int `json:"minPrice,omitempty"`
+
+	// SoldOutTicketTypes Number of sold out ticket types
+	SoldOutTicketTypes *int `json:"soldOutTicketTypes,omitempty"`
+
+	// TotalTicketTypes Total number of distinct ticket types
+	TotalTicketTypes *int `json:"totalTicketTypes,omitempty"`
 }
 
 // HealthResponse defines model for HealthResponse.
@@ -85,6 +162,7 @@ type HealthResponse struct {
 	Service   string `json:"service"`
 	Status    string `json:"status"`
 	Timestamp int64  `json:"timestamp"`
+	Version   string `json:"version"`
 }
 
 // ParseRequest defines model for ParseRequest.
@@ -92,80 +170,156 @@ type ParseRequest struct {
 	// Id TicketDive event ID
 	Id *string `json:"id,omitempty"`
 
+	// Refresh Bypass cache and force refresh
+	Refresh *bool `json:"refresh,omitempty"`
+
 	// Url TicketDive event URL
+	Url *string `json:"url,omitempty"`
+}
+
+// SourceMetadata Upstream source provenance and platform details
+type SourceMetadata struct {
+	// BuildId Next.js upstream build ID
+	BuildId *string `json:"buildId,omitempty"`
+
+	// FetchedAt Upstream fetch timestamp
+	FetchedAt *time.Time `json:"fetchedAt,omitempty"`
+
+	// Platform Source ticketing platform
+	Platform *string `json:"platform,omitempty"`
+
+	// ServerTime Server timestamp reported by upstream
+	ServerTime *int64 `json:"serverTime,omitempty"`
+
+	// Url Original source URL
 	Url *string `json:"url,omitempty"`
 }
 
 // Stage defines model for Stage.
 type Stage struct {
 	Artists *[]Artist `json:"artists,omitempty"`
-	Id      string    `json:"id"`
 
-	// OpenAt Doors open time
+	// EndAt Estimated or scheduled finish time (ISO 8601)
+	EndAt *string `json:"endAt,omitempty"`
+	Id    string  `json:"id"`
+
+	// Metadata Extensible stage metadata
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+
+	// OpenAt Doors open time (ISO 8601)
 	OpenAt    *string `json:"openAt,omitempty"`
 	StageName string  `json:"stageName"`
 
-	// StartAt Show start time
+	// StartAt Show start time (ISO 8601)
 	StartAt *string `json:"startAt,omitempty"`
-	Venue   *Venue  `json:"venue,omitempty"`
+
+	// Timetable Optional slot-by-slot schedule if resolved
+	Timetable *[]TimetableSlot `json:"timetable,omitempty"`
+	Venue     *Venue           `json:"venue,omitempty"`
 }
 
 // TicketGroup defines model for TicketGroup.
 type TicketGroup struct {
 	Customize *[]CustomizeQuestion `json:"customize,omitempty"`
 
-	// EndApply Application end timestamp
-	EndApply *string `json:"endApply,omitempty"`
-	Id       string  `json:"id"`
+	// EndApply Application end timestamp (ISO 8601)
+	EndApply *string                 `json:"endApply,omitempty"`
+	Id       string                  `json:"id"`
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
-	// Name Group name (e.g. 一般販売, 最前OP 一般販売)
+	// Name Group name (e.g. 一般販売, 最前OP 一般販売, FC先行販売)
 	Name            string    `json:"name"`
 	PaymentChannels *[]string `json:"paymentChannels,omitempty"`
 
-	// ReceptionType Reception type (first=先着, lottery=抽選)
+	// ReceptionType Reception method (first=先着, lottery=抽選)
 	ReceptionType string `json:"receptionType"`
 
-	// StartApply Application start timestamp
-	StartApply *string      `json:"startApply,omitempty"`
-	Status     *string      `json:"status,omitempty"`
-	Types      []TicketType `json:"types"`
+	// Restrictions Rules such as untransferable, fcOnly, phoneNumberNeeded
+	Restrictions *[]string `json:"restrictions,omitempty"`
+
+	// StartApply Application start timestamp (ISO 8601)
+	StartApply *string `json:"startApply,omitempty"`
+
+	// Status Current reception status (e.g. applied, closed, upcoming)
+	Status *string      `json:"status,omitempty"`
+	Types  []TicketType `json:"types"`
 }
 
 // TicketType defines model for TicketType.
 type TicketType struct {
-	Detail *string `json:"detail,omitempty"`
-	Fee    *int    `json:"fee,omitempty"`
-	Id     string  `json:"id"`
+	// Currency Three-letter ISO 4217 currency code
+	Currency *string `json:"currency,omitempty"`
+	Detail   *string `json:"detail,omitempty"`
 
-	// IsSoldOut Whether this ticket type is sold out
+	// Fee Handling fee
+	Fee *int   `json:"fee,omitempty"`
+	Id  string `json:"id"`
+
+	// IsSoldOut Whether this ticket type is currently sold out
 	IsSoldOut bool `json:"isSoldOut"`
 
-	// MaxNumPerApply Maximum tickets per application
-	MaxNumPerApply *int   `json:"maxNumPerApply,omitempty"`
-	Name           string `json:"name"`
+	// MaxNumPerApply Maximum tickets allowed per application
+	MaxNumPerApply *int `json:"maxNumPerApply,omitempty"`
 
-	// Prefix Ticket number prefix
+	// Metadata Extensible vendor-specific ticket attributes
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+	Name     string                  `json:"name"`
+
+	// Prefix Ticket reference number prefix (e.g. IA, IB, IHS)
 	Prefix *string `json:"prefix,omitempty"`
-	Price  int     `json:"price"`
 
-	// RemainingRate Stock ratio (1 = remaining, 0 = sold out)
+	// Price Base ticket price
+	Price int `json:"price"`
+
+	// RemainingRate Stock ratio (1.0 = in stock, 0.0 = sold out)
 	RemainingRate *float32 `json:"remainingRate,omitempty"`
 
-	// Status Status string (applied, closed)
+	// Status Status string from upstream (applied, closed, etc.)
 	Status *string `json:"status,omitempty"`
+
+	// TotalPrice Combined price and fee
+	TotalPrice *int `json:"totalPrice,omitempty"`
+}
+
+// TimetableSlot defines model for TimetableSlot.
+type TimetableSlot struct {
+	ArtistId   *string                 `json:"artistId,omitempty"`
+	ArtistName string                  `json:"artistName"`
+	EndAt      *time.Time              `json:"endAt,omitempty"`
+	Metadata   *map[string]interface{} `json:"metadata,omitempty"`
+
+	// ParallelOrder Stage or parallel group index
+	ParallelOrder *int       `json:"parallelOrder,omitempty"`
+	StartAt       *time.Time `json:"startAt,omitempty"`
 }
 
 // Venue defines model for Venue.
 type Venue struct {
-	Address *string `json:"address,omitempty"`
-	Name    *string `json:"name,omitempty"`
+	Address  *string                 `json:"address,omitempty"`
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+	Name     *string                 `json:"name,omitempty"`
+
+	// Url Venue official website or map URL
+	Url *string `json:"url,omitempty"`
 }
 
 // GetEventByUrlParams defines parameters for GetEventByUrl.
 type GetEventByUrlParams struct {
 	// Url TicketDive URL (full or shortened, e.g. https://ticketdive.com/event/plkt1022 or https://t-dv.com/plkt1022)
 	Url string `form:"url" json:"url"`
+
+	// Refresh Bypass cache and force refresh from upstream
+	Refresh *bool `form:"refresh,omitempty" json:"refresh,omitempty"`
 }
+
+// GetEventByIdParams defines parameters for GetEventById.
+type GetEventByIdParams struct {
+	// Refresh Bypass cache and force refresh from upstream
+	Refresh *bool `form:"refresh,omitempty" json:"refresh,omitempty"`
+}
+
+// BatchParseEventsJSONRequestBody defines body for BatchParseEvents for application/json ContentType.
+type BatchParseEventsJSONRequestBody = BatchParseRequest
 
 // ParseEventJSONRequestBody defines body for ParseEvent for application/json ContentType.
 type ParseEventJSONRequestBody = ParseRequest
@@ -246,13 +400,18 @@ type ClientInterface interface {
 	// GetEventByUrl request
 	GetEventByUrl(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BatchParseEventsWithBody request with any body
+	BatchParseEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	BatchParseEvents(ctx context.Context, body BatchParseEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ParseEventWithBody request with any body
 	ParseEventWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	ParseEvent(ctx context.Context, body ParseEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetEventById request
-	GetEventById(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetEventById(ctx context.Context, eventId string, params *GetEventByIdParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetEventIcal request
 	GetEventIcal(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -263,6 +422,30 @@ type ClientInterface interface {
 
 func (c *Client) GetEventByUrl(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetEventByUrlRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BatchParseEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBatchParseEventsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) BatchParseEvents(ctx context.Context, body BatchParseEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBatchParseEventsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +480,8 @@ func (c *Client) ParseEvent(ctx context.Context, body ParseEventJSONRequestBody,
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetEventById(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetEventByIdRequest(c.Server, eventId)
+func (c *Client) GetEventById(ctx context.Context, eventId string, params *GetEventByIdParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEventByIdRequest(c.Server, eventId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -367,6 +550,22 @@ func NewGetEventByUrlRequest(server string, params *GetEventByUrlParams) (*http.
 			}
 		}
 
+		if params.Refresh != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "refresh", runtime.ParamLocationQuery, *params.Refresh); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -374,6 +573,46 @@ func NewGetEventByUrlRequest(server string, params *GetEventByUrlParams) (*http.
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewBatchParseEventsRequest calls the generic BatchParseEvents builder with application/json body
+func NewBatchParseEventsRequest(server string, body BatchParseEventsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewBatchParseEventsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewBatchParseEventsRequestWithBody generates requests for BatchParseEvents with any type of body
+func NewBatchParseEventsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/events/batch")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -419,7 +658,7 @@ func NewParseEventRequestWithBody(server string, contentType string, body io.Rea
 }
 
 // NewGetEventByIdRequest generates requests for GetEventById
-func NewGetEventByIdRequest(server string, eventId string) (*http.Request, error) {
+func NewGetEventByIdRequest(server string, eventId string, params *GetEventByIdParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -442,6 +681,28 @@ func NewGetEventByIdRequest(server string, eventId string) (*http.Request, error
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Refresh != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "refresh", runtime.ParamLocationQuery, *params.Refresh); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -559,13 +820,18 @@ type ClientWithResponsesInterface interface {
 	// GetEventByUrlWithResponse request
 	GetEventByUrlWithResponse(ctx context.Context, params *GetEventByUrlParams, reqEditors ...RequestEditorFn) (*GetEventByUrlResponse, error)
 
+	// BatchParseEventsWithBodyWithResponse request with any body
+	BatchParseEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchParseEventsResponse, error)
+
+	BatchParseEventsWithResponse(ctx context.Context, body BatchParseEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchParseEventsResponse, error)
+
 	// ParseEventWithBodyWithResponse request with any body
 	ParseEventWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ParseEventResponse, error)
 
 	ParseEventWithResponse(ctx context.Context, body ParseEventJSONRequestBody, reqEditors ...RequestEditorFn) (*ParseEventResponse, error)
 
 	// GetEventByIdWithResponse request
-	GetEventByIdWithResponse(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*GetEventByIdResponse, error)
+	GetEventByIdWithResponse(ctx context.Context, eventId string, params *GetEventByIdParams, reqEditors ...RequestEditorFn) (*GetEventByIdResponse, error)
 
 	// GetEventIcalWithResponse request
 	GetEventIcalWithResponse(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*GetEventIcalResponse, error)
@@ -592,6 +858,30 @@ func (r GetEventByUrlResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetEventByUrlResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type BatchParseEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BatchEventResponse
+	JSON400      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r BatchParseEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BatchParseEventsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -701,6 +991,23 @@ func (c *ClientWithResponses) GetEventByUrlWithResponse(ctx context.Context, par
 	return ParseGetEventByUrlResponse(rsp)
 }
 
+// BatchParseEventsWithBodyWithResponse request with arbitrary body returning *BatchParseEventsResponse
+func (c *ClientWithResponses) BatchParseEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchParseEventsResponse, error) {
+	rsp, err := c.BatchParseEventsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBatchParseEventsResponse(rsp)
+}
+
+func (c *ClientWithResponses) BatchParseEventsWithResponse(ctx context.Context, body BatchParseEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchParseEventsResponse, error) {
+	rsp, err := c.BatchParseEvents(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBatchParseEventsResponse(rsp)
+}
+
 // ParseEventWithBodyWithResponse request with arbitrary body returning *ParseEventResponse
 func (c *ClientWithResponses) ParseEventWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ParseEventResponse, error) {
 	rsp, err := c.ParseEventWithBody(ctx, contentType, body, reqEditors...)
@@ -719,8 +1026,8 @@ func (c *ClientWithResponses) ParseEventWithResponse(ctx context.Context, body P
 }
 
 // GetEventByIdWithResponse request returning *GetEventByIdResponse
-func (c *ClientWithResponses) GetEventByIdWithResponse(ctx context.Context, eventId string, reqEditors ...RequestEditorFn) (*GetEventByIdResponse, error) {
-	rsp, err := c.GetEventById(ctx, eventId, reqEditors...)
+func (c *ClientWithResponses) GetEventByIdWithResponse(ctx context.Context, eventId string, params *GetEventByIdParams, reqEditors ...RequestEditorFn) (*GetEventByIdResponse, error) {
+	rsp, err := c.GetEventById(ctx, eventId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -761,6 +1068,46 @@ func ParseGetEventByUrlResponse(rsp *http.Response) (*GetEventByUrlResponse, err
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest EventResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseBatchParseEventsResponse parses an HTTP response from a BatchParseEventsWithResponse call
+func ParseBatchParseEventsResponse(rsp *http.Response) (*BatchParseEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BatchParseEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BatchEventResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -936,12 +1283,15 @@ type ServerInterface interface {
 	// Get Event by URL Query
 	// (GET /api/v1/events)
 	GetEventByUrl(w http.ResponseWriter, r *http.Request, params GetEventByUrlParams)
+	// Batch Parse Events
+	// (POST /api/v1/events/batch)
+	BatchParseEvents(w http.ResponseWriter, r *http.Request)
 	// Parse Event
 	// (POST /api/v1/events/parse)
 	ParseEvent(w http.ResponseWriter, r *http.Request)
 	// Get Event by ID
 	// (GET /api/v1/events/{eventId})
-	GetEventById(w http.ResponseWriter, r *http.Request, eventId string)
+	GetEventById(w http.ResponseWriter, r *http.Request, eventId string, params GetEventByIdParams)
 	// Get Event iCalendar Feed
 	// (GET /api/v1/events/{eventId}/ical)
 	GetEventIcal(w http.ResponseWriter, r *http.Request, eventId string)
@@ -982,8 +1332,30 @@ func (siw *ServerInterfaceWrapper) GetEventByUrl(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// ------------- Optional query parameter "refresh" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "refresh", r.URL.Query(), &params.Refresh)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "refresh", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEventByUrl(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BatchParseEvents operation middleware
+func (siw *ServerInterfaceWrapper) BatchParseEvents(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BatchParseEvents(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1021,8 +1393,19 @@ func (siw *ServerInterfaceWrapper) GetEventById(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEventByIdParams
+
+	// ------------- Optional query parameter "refresh" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "refresh", r.URL.Query(), &params.Refresh)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "refresh", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetEventById(w, r, eventId)
+		siw.Handler.GetEventById(w, r, eventId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1192,6 +1575,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/events", wrapper.GetEventByUrl)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/events/batch", wrapper.BatchParseEvents)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/events/parse", wrapper.ParseEvent)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/events/{eventId}", wrapper.GetEventById)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/events/{eventId}/ical", wrapper.GetEventIcal)
@@ -1203,43 +1587,66 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"5L425aI6Z86Zxtatrf8HAAD///DukjlUIQAA",
+	"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",
+	"fwIAAP//eUl5Uno5AAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

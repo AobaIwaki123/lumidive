@@ -98,11 +98,12 @@ func TestParseHTML(t *testing.T) {
 		ShortURL:     "https://t-dv.com/test_live",
 	}
 
-	event, err := ParseHTML(sampleHTML, norm)
+	res, err := ParseHTML(sampleHTML, norm)
 	if err != nil {
 		t.Fatalf("ParseHTML() error = %v", err)
 	}
 
+	event := res.Event
 	if event.Id != "event_id_001" {
 		t.Errorf("Id = %v, want event_id_001", event.Id)
 	}
@@ -111,6 +112,25 @@ func TestParseHTML(t *testing.T) {
 	}
 	if event.Slug != "test_live" {
 		t.Errorf("Slug = %v, want test_live", event.Slug)
+	}
+
+	// Verify stats
+	if event.Stats == nil {
+		t.Fatalf("expected Stats not nil")
+	}
+	if *event.Stats.TotalTicketTypes != 2 {
+		t.Errorf("totalTicketTypes = %d, want 2", *event.Stats.TotalTicketTypes)
+	}
+	if *event.Stats.SoldOutTicketTypes != 1 {
+		t.Errorf("soldOutTicketTypes = %d, want 1", *event.Stats.SoldOutTicketTypes)
+	}
+	if !*event.Stats.HasAvailableTickets {
+		t.Errorf("expected hasAvailableTickets true")
+	}
+
+	// Verify source
+	if res.Source == nil || *res.Source.Platform != "ticketdive" {
+		t.Errorf("expected source platform ticketdive, got %v", res.Source)
 	}
 
 	// Verify stages
@@ -170,12 +190,12 @@ func TestGenerateICal(t *testing.T) {
 		EventID:      "test_live",
 		CanonicalURL: "https://ticketdive.com/event/test_live",
 	}
-	event, err := ParseHTML(sampleHTML, norm)
+	res, err := ParseHTML(sampleHTML, norm)
 	if err != nil {
 		t.Fatalf("ParseHTML() failed: %v", err)
 	}
 
-	cal, err := GenerateICal(event)
+	cal, err := GenerateICal(res.Event)
 	if err != nil {
 		t.Fatalf("GenerateICal() error = %v", err)
 	}

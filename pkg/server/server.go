@@ -4,11 +4,14 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/AobaIwaki123/lumidive/pkg/api"
 	"github.com/AobaIwaki123/lumidive/pkg/ticketdive"
 )
+
+const currentAPIVersion = "1.0"
 
 // Server implements api.ServerInterface.
 type Server struct {
@@ -28,6 +31,7 @@ func (s *Server) GetHealth(w http.ResponseWriter, _ *http.Request) {
 	resp := api.HealthResponse{
 		Status:    "ok",
 		Service:   "lumidive",
+		Version:   "1.0.0",
 		Timestamp: time.Now().UnixMilli(),
 	}
 	s.writeJSON(w, http.StatusOK, resp)
@@ -35,22 +39,30 @@ func (s *Server) GetHealth(w http.ResponseWriter, _ *http.Request) {
 
 // GetEventById fetches event metadata by event ID.
 // (GET /api/v1/events/{eventId})
-func (s *Server) GetEventById(w http.ResponseWriter, r *http.Request, eventID string) {
+func (s *Server) GetEventById(w http.ResponseWriter, r *http.Request, eventID string, params api.GetEventByIdParams) {
 	if eventID == "" {
-		s.writeError(w, http.StatusBadRequest, "event ID is required")
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "event ID is required", nil)
 		return
 	}
 
-	event, cached, err := s.service.GetEvent(r.Context(), eventID)
+	refresh := false
+	if params.Refresh != nil {
+		refresh = *params.Refresh
+	}
+
+	event, cached, source, cachedAt, err := s.service.GetEvent(r.Context(), eventID, refresh)
 	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
 		return
 	}
 
 	s.writeJSON(w, http.StatusOK, api.EventResponse{
-		Success: true,
-		Cached:  cached,
-		Data:    *event,
+		ApiVersion: currentAPIVersion,
+		Success:    true,
+		Cached:     cached,
+		CachedAt:   cachedAt,
+		Source:     source,
+		Data:       *event,
 	})
 }
 
@@ -58,20 +70,28 @@ func (s *Server) GetEventById(w http.ResponseWriter, r *http.Request, eventID st
 // (GET /api/v1/events)
 func (s *Server) GetEventByUrl(w http.ResponseWriter, r *http.Request, params api.GetEventByUrlParams) {
 	if params.Url == "" {
-		s.writeError(w, http.StatusBadRequest, "query parameter 'url' is required")
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "query parameter 'url' is required", nil)
 		return
 	}
 
-	event, cached, err := s.service.GetEvent(r.Context(), params.Url)
+	refresh := false
+	if params.Refresh != nil {
+		refresh = *params.Refresh
+	}
+
+	event, cached, source, cachedAt, err := s.service.GetEvent(r.Context(), params.Url, refresh)
 	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
 		return
 	}
 
 	s.writeJSON(w, http.StatusOK, api.EventResponse{
-		Success: true,
-		Cached:  cached,
-		Data:    *event,
+		ApiVersion: currentAPIVersion,
+		Success:    true,
+		Cached:     cached,
+		CachedAt:   cachedAt,
+		Source:     source,
+		Data:       *event,
 	})
 }
 
@@ -80,7 +100,7 @@ func (s *Server) GetEventByUrl(w http.ResponseWriter, r *http.Request, params ap
 func (s *Server) ParseEvent(w http.ResponseWriter, r *http.Request) {
 	var req api.ParseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeError(w, http.StatusBadRequest, "invalid JSON payload")
+		s.writeError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "invalid JSON payload", nil)
 		return
 	}
 
@@ -92,40 +112,101 @@ func (s *Server) ParseEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if target == "" {
-		s.writeError(w, http.StatusBadRequest, "either 'url' or 'id' must be provided")
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "either 'url' or 'id' must be provided", nil)
 		return
 	}
 
-	event, cached, err := s.service.GetEvent(r.Context(), target)
+	refresh := false
+	if req.Refresh != nil {
+		refresh = *req.Refresh
+	}
+
+	event, cached, source, cachedAt, err := s.service.GetEvent(r.Context(), target, refresh)
 	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
 		return
 	}
 
 	s.writeJSON(w, http.StatusOK, api.EventResponse{
-		Success: true,
-		Cached:  cached,
-		Data:    *event,
+		ApiVersion: currentAPIVersion,
+		Success:    true,
+		Cached:     cached,
+		CachedAt:   cachedAt,
+		Source:     source,
+		Data:       *event,
+	})
+}
+
+// BatchParseEvents parses multiple events in a single batch.
+// (POST /api/v1/events/batch)
+func (s *Server) BatchParseEvents(w http.ResponseWriter, r *http.Request) {
+	var req api.BatchParseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "invalid JSON payload", nil)
+		return
+	}
+
+	if len(req.Targets) == 0 {
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "targets array must not be empty", nil)
+		return
+	}
+
+	refresh := false
+	if req.Refresh != nil {
+		refresh = *req.Refresh
+	}
+
+	results := make([]api.BatchEventResult, len(req.Targets))
+	var wg sync.WaitGroup
+
+	for i, target := range req.Targets {
+		wg.Add(1)
+		go func(idx int, tgt string) {
+			defer wg.Done()
+			ev, _, _, _, err := s.service.GetEvent(r.Context(), tgt, refresh)
+			if err != nil {
+				errMsg := err.Error()
+				results[idx] = api.BatchEventResult{
+					Target:  tgt,
+					Success: false,
+					Error:   &errMsg,
+				}
+				return
+			}
+			results[idx] = api.BatchEventResult{
+				Target:  tgt,
+				Success: true,
+				Event:   ev,
+			}
+		}(i, target)
+	}
+
+	wg.Wait()
+
+	s.writeJSON(w, http.StatusOK, api.BatchEventResponse{
+		ApiVersion: currentAPIVersion,
+		Success:    true,
+		Results:    results,
 	})
 }
 
 // GetEventIcal returns iCalendar format for the event.
-// (GET /api/v1/events/{eventId}.ics)
+// (GET /api/v1/events/{eventId}/ical)
 func (s *Server) GetEventIcal(w http.ResponseWriter, r *http.Request, eventID string) {
 	if eventID == "" {
-		s.writeError(w, http.StatusBadRequest, "event ID is required")
+		s.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "event ID is required", nil)
 		return
 	}
 
-	event, _, err := s.service.GetEvent(r.Context(), eventID)
+	event, _, _, _, err := s.service.GetEvent(r.Context(), eventID, false)
 	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
+		s.writeError(w, http.StatusInternalServerError, "UPSTREAM_ERROR", err.Error(), nil)
 		return
 	}
 
 	calData, err := ticketdive.GenerateICal(event)
 	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
+		s.writeError(w, http.StatusInternalServerError, "ICAL_ERROR", err.Error(), nil)
 		return
 	}
 
@@ -140,9 +221,15 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, data any) {
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
-	s.writeJSON(w, status, api.ErrorResponse{
-		Success: false,
-		Error:   message,
-	})
+func (s *Server) writeError(w http.ResponseWriter, status int, code, message string, details []string) {
+	resp := api.ErrorResponse{
+		ApiVersion: currentAPIVersion,
+		Success:    false,
+		Code:       &code,
+		Error:      message,
+	}
+	if len(details) > 0 {
+		resp.Details = &details
+	}
+	s.writeJSON(w, status, resp)
 }

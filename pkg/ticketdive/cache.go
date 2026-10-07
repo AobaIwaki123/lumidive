@@ -12,7 +12,7 @@ import (
 
 type cacheEntry struct {
 	cachedAt time.Time
-	event    *api.Event
+	result   *ParseResult
 }
 
 // CachedService wraps Client with an in-memory TTL cache and singleflight request deduplication.
@@ -34,32 +34,35 @@ func NewCachedService(client *Client, ttl time.Duration) *CachedService {
 }
 
 // GetEvent fetches an event with caching.
-// Returns (event, cached, error).
-func (s *CachedService) GetEvent(ctx context.Context, rawInput string) (*api.Event, bool, error) {
+// Returns (event, cached, source, cachedAt, error).
+func (s *CachedService) GetEvent(ctx context.Context, rawInput string, refresh bool) (*api.Event, bool, *api.SourceMetadata, *time.Time, error) {
 	norm, err := NormalizeInput(rawInput)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, nil, err
 	}
 
 	key := norm.EventID
 
-	// Check cache
-	s.mu.RLock()
-	entry, found := s.cache[key]
-	s.mu.RUnlock()
+	// Check cache if not refresh
+	if !refresh {
+		s.mu.RLock()
+		entry, found := s.cache[key]
+		s.mu.RUnlock()
 
-	if found && time.Since(entry.cachedAt) < s.ttl {
-		return entry.event, true, nil
+		if found && time.Since(entry.cachedAt) < s.ttl {
+			return entry.result.Event, true, entry.result.Source, &entry.cachedAt, nil
+		}
 	}
 
 	// Singleflight fetch
 	res, err, _ := s.sf.Do(key, func() (any, error) {
-		// Double check under lock in case another goroutine just resolved it
-		s.mu.RLock()
-		e, ok := s.cache[key]
-		s.mu.RUnlock()
-		if ok && time.Since(e.cachedAt) < s.ttl {
-			return e.event, nil
+		if !refresh {
+			s.mu.RLock()
+			e, ok := s.cache[key]
+			s.mu.RUnlock()
+			if ok && time.Since(e.cachedAt) < s.ttl {
+				return e, nil
+			}
 		}
 
 		fetched, fetchErr := s.client.FetchEvent(ctx, rawInput)
@@ -67,24 +70,26 @@ func (s *CachedService) GetEvent(ctx context.Context, rawInput string) (*api.Eve
 			return nil, fetchErr
 		}
 
-		s.mu.Lock()
-		s.cache[key] = cacheEntry{
-			cachedAt: time.Now(),
-			event:    fetched,
+		entry := cacheEntry{
+			cachedAt: time.Now().UTC(),
+			result:   fetched,
 		}
+
+		s.mu.Lock()
+		s.cache[key] = entry
 		s.mu.Unlock()
 
-		return fetched, nil
+		return entry, nil
 	})
 
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, nil, err
 	}
 
-	ev, ok := res.(*api.Event)
-	if !ok {
-		return nil, false, nil
+	entry, ok := res.(cacheEntry)
+	if !ok || entry.result == nil {
+		return nil, false, nil, nil, nil
 	}
 
-	return ev, false, nil
+	return entry.result.Event, false, entry.result.Source, &entry.cachedAt, nil
 }

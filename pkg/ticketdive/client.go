@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/AobaIwaki123/lumidive/pkg/api"
 )
 
 const defaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -59,7 +57,7 @@ func NewClient(opts ...ClientOption) *Client {
 }
 
 // FetchEvent fetches an event by raw URL or event ID.
-func (c *Client) FetchEvent(ctx context.Context, rawInput string) (*api.Event, error) {
+func (c *Client) FetchEvent(ctx context.Context, rawInput string) (*ParseResult, error) {
 	norm, err := NormalizeInput(rawInput)
 	if err != nil {
 		return nil, err

@@ -65,7 +65,7 @@ func runParse(args []string) {
 
 	target := args[0]
 	client := ticketdive.NewClient()
-	event, err := client.FetchEvent(context.Background(), target)
+	res, err := client.FetchEvent(context.Background(), target)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -74,7 +74,7 @@ func runParse(args []string) {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(event); err != nil {
+	if err := enc.Encode(res.Event); err != nil {
 		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
 		os.Exit(1)
 	}
@@ -88,13 +88,13 @@ func runICal(args []string) {
 
 	target := args[0]
 	client := ticketdive.NewClient()
-	event, err := client.FetchEvent(context.Background(), target)
+	res, err := client.FetchEvent(context.Background(), target)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	cal, err := ticketdive.GenerateICal(event)
+	cal, err := ticketdive.GenerateICal(res.Event)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating iCal: %v\n", err)
 		os.Exit(1)

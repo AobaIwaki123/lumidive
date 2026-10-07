@@ -2,7 +2,7 @@ openapi: "3.0.3"
 info:
   title: "lumidive API"
   version: "1.0.0"
-  description: "TicketDive event adapter, metadata proxy, and iCalendar feed generator."
+  description: "TicketDive event adapter, metadata proxy, batch resolution, and iCalendar feed generator."
   license:
     name: "MIT"
     url: "https://opensource.org/licenses/MIT"
@@ -14,7 +14,7 @@ paths:
   /healthz:
     get:
       summary: "Health Check"
-      description: "Returns health status of lumidive service."
+      description: "Returns health status and version of lumidive service."
       operationId: "getHealth"
       responses:
         "200":
@@ -36,6 +36,13 @@ paths:
           description: "TicketDive event ID or URL slug (e.g. plkt1022)"
           schema:
             type: "string"
+        - name: "refresh"
+          in: "query"
+          required: false
+          description: "Bypass cache and force refresh from upstream"
+          schema:
+            type: "boolean"
+            default: false
       responses:
         "200":
           description: "Event details"
@@ -65,7 +72,7 @@ paths:
   /api/v1/events/{eventId}/ical:
     get:
       summary: "Get Event iCalendar Feed"
-      description: "Generates an iCalendar (.ics) file for the specified event."
+      description: "Generates an iCalendar (.ics) RFC 5545 calendar feed for the specified event."
       operationId: "getEventIcal"
       parameters:
         - name: "eventId"
@@ -106,6 +113,13 @@ paths:
           description: "TicketDive URL (full or shortened, e.g. https://ticketdive.com/event/plkt1022 or https://t-dv.com/plkt1022)"
           schema:
             type: "string"
+        - name: "refresh"
+          in: "query"
+          required: false
+          description: "Bypass cache and force refresh from upstream"
+          schema:
+            type: "boolean"
+            default: false
       responses:
         "200":
           description: "Event details"
@@ -157,6 +171,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/events/batch:
+    post:
+      summary: "Batch Parse Events"
+      description: "Resolves and parses multiple TicketDive events in a single call."
+      operationId: "batchParseEvents"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchParseRequest"
+      responses:
+        "200":
+          description: "Batch parse results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchEventResponse"
+        "400":
+          description: "Invalid Request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Internal Server Error"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthResponse:
@@ -164,6 +209,7 @@ components:
       required:
         - "status"
         - "service"
+        - "version"
         - "timestamp"
       properties:
         status:
@@ -172,6 +218,9 @@ components:
         service:
           type: "string"
           example: "lumidive"
+        version:
+          type: "string"
+          example: "1.0.0"
         timestamp:
           type: "integer"
           format: "int64"
@@ -188,22 +237,112 @@ components:
           type: "string"
           description: "TicketDive event ID"
           example: "plkt1022"
+        refresh:
+          type: "boolean"
+          description: "Bypass cache and force refresh"
+          default: false
+
+    BatchParseRequest:
+      type: "object"
+      required:
+        - "targets"
+      properties:
+        targets:
+          type: "array"
+          items:
+            type: "string"
+          description: "List of event URLs or IDs to parse"
+          example: ["plkt1022", "https://t-dv.com/tgg_1006"]
+        refresh:
+          type: "boolean"
+          description: "Bypass cache and force refresh"
+          default: false
+
+    SourceMetadata:
+      type: "object"
+      description: "Upstream source provenance and platform details"
+      properties:
+        platform:
+          type: "string"
+          description: "Source ticketing platform"
+          example: "ticketdive"
+        url:
+          type: "string"
+          description: "Original source URL"
+          example: "https://ticketdive.com/event/plkt1022"
+        buildId:
+          type: "string"
+          description: "Next.js upstream build ID"
+          example: "DKPoTbxAqISse_0XBEukK"
+        fetchedAt:
+          type: "string"
+          format: "date-time"
+          description: "Upstream fetch timestamp"
+        serverTime:
+          type: "integer"
+          format: "int64"
+          description: "Server timestamp reported by upstream"
 
     EventResponse:
       type: "object"
       required:
+        - "apiVersion"
         - "success"
         - "cached"
         - "data"
       properties:
+        apiVersion:
+          type: "string"
+          example: "1.0"
         success:
           type: "boolean"
           example: true
         cached:
           type: "boolean"
           example: false
+        cachedAt:
+          type: "string"
+          format: "date-time"
+          description: "Timestamp when the cache entry was created"
+        source:
+          $ref: "#/components/schemas/SourceMetadata"
         data:
           $ref: "#/components/schemas/Event"
+
+    BatchEventResult:
+      type: "object"
+      required:
+        - "target"
+        - "success"
+      properties:
+        target:
+          type: "string"
+          description: "Requested target URL or ID"
+        success:
+          type: "boolean"
+        event:
+          $ref: "#/components/schemas/Event"
+        error:
+          type: "string"
+          description: "Error message if parsing this target failed"
+
+    BatchEventResponse:
+      type: "object"
+      required:
+        - "apiVersion"
+        - "success"
+        - "results"
+      properties:
+        apiVersion:
+          type: "string"
+          example: "1.0"
+        success:
+          type: "boolean"
+          example: true
+        results:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/BatchEventResult"
 
     Event:
       type: "object"
@@ -216,11 +355,11 @@ components:
       properties:
         id:
           type: "string"
-          description: "Internal event ID"
+          description: "Internal event ID (e.g. Firestore document ID)"
           example: "drIPQl23ZVboh1BWQy6y"
         slug:
           type: "string"
-          description: "Event URL slug"
+          description: "Event URL slug identifier"
           example: "plkt1022"
         name:
           type: "string"
@@ -257,7 +396,38 @@ components:
           type: "array"
           items:
             type: "string"
-          description: "Flyer image URLs"
+          description: "Flyer and banner image URLs"
+        stats:
+          $ref: "#/components/schemas/EventStats"
+        metadata:
+          type: "object"
+          additionalProperties: true
+          description: "Extensible dictionary for future or platform-specific attributes"
+
+    EventStats:
+      type: "object"
+      description: "Aggregated statistical indicators for the event"
+      properties:
+        totalTicketTypes:
+          type: "integer"
+          description: "Total number of distinct ticket types"
+          example: 10
+        soldOutTicketTypes:
+          type: "integer"
+          description: "Number of sold out ticket types"
+          example: 5
+        minPrice:
+          type: "integer"
+          description: "Lowest available ticket price"
+          example: 1000
+        maxPrice:
+          type: "integer"
+          description: "Highest available ticket price"
+          example: 4200
+        hasAvailableTickets:
+          type: "boolean"
+          description: "Whether at least one ticket type remains available"
+          example: true
 
     Stage:
       type: "object"
@@ -273,18 +443,31 @@ components:
           example: "WOMBLIVE"
         startAt:
           type: "string"
-          description: "Show start time"
+          description: "Show start time (ISO 8601)"
           example: "2026-10-22T06:45:00.000Z"
         openAt:
           type: "string"
-          description: "Doors open time"
+          description: "Doors open time (ISO 8601)"
           example: "2026-10-22T06:15:00.000Z"
+        endAt:
+          type: "string"
+          description: "Estimated or scheduled finish time (ISO 8601)"
+          example: "2026-10-22T10:00:00.000Z"
         venue:
           $ref: "#/components/schemas/Venue"
         artists:
           type: "array"
           items:
             $ref: "#/components/schemas/Artist"
+        timetable:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/TimetableSlot"
+          description: "Optional slot-by-slot schedule if resolved"
+        metadata:
+          type: "object"
+          additionalProperties: true
+          description: "Extensible stage metadata"
 
     Venue:
       type: "object"
@@ -294,7 +477,13 @@ components:
           example: "WOMBLIVE"
         address:
           type: "string"
-          example: ""
+          example: "東京都渋谷区円山町2-16"
+        url:
+          type: "string"
+          description: "Venue official website or map URL"
+        metadata:
+          type: "object"
+          additionalProperties: true
 
     Artist:
       type: "object"
@@ -304,10 +493,41 @@ components:
       properties:
         id:
           type: "string"
+          description: "Artist slug or ID"
           example: "honeyspice-re"
         name:
           type: "string"
+          description: "Artist display name"
           example: "ハニースパイスRe."
+        url:
+          type: "string"
+          description: "Profile or TicketDive artist URL"
+          example: "https://ticketdive.com/artist/honeyspice-re"
+        metadata:
+          type: "object"
+          additionalProperties: true
+
+    TimetableSlot:
+      type: "object"
+      required:
+        - "artistName"
+      properties:
+        artistId:
+          type: "string"
+        artistName:
+          type: "string"
+        startAt:
+          type: "string"
+          format: "date-time"
+        endAt:
+          type: "string"
+          format: "date-time"
+        parallelOrder:
+          type: "integer"
+          description: "Stage or parallel group index"
+        metadata:
+          type: "object"
+          additionalProperties: true
 
     TicketGroup:
       type: "object"
@@ -322,40 +542,52 @@ components:
           example: "EHV68qpqSYQB2qdJGAji"
         name:
           type: "string"
-          description: "Group name (e.g. 一般販売, 最前OP 一般販売)"
+          description: "Group name (e.g. 一般販売, 最前OP 一般販売, FC先行販売)"
           example: "一般販売"
         receptionType:
           type: "string"
-          description: "Reception type (first=先着, lottery=抽選)"
+          description: "Reception method (first=先着, lottery=抽選)"
           example: "first"
         startApply:
           type: "string"
-          description: "Application start timestamp"
+          description: "Application start timestamp (ISO 8601)"
           example: "2026-10-02T11:00:00.000Z"
         endApply:
           type: "string"
-          description: "Application end timestamp"
+          description: "Application end timestamp (ISO 8601)"
           example: "2026-10-22T06:45:00.000Z"
         paymentChannels:
           type: "array"
           items:
             type: "string"
           example: ["card", "konbini"]
+        restrictions:
+          type: "array"
+          items:
+            type: "string"
+          description: "Rules such as untransferable, fcOnly, phoneNumberNeeded"
+          example: ["untransferable"]
         customize:
           type: "array"
           items:
             $ref: "#/components/schemas/CustomizeQuestion"
         status:
           type: "string"
+          description: "Current reception status (e.g. applied, closed, upcoming)"
           example: "applied"
         types:
           type: "array"
           items:
             $ref: "#/components/schemas/TicketType"
+        metadata:
+          type: "object"
+          additionalProperties: true
 
     CustomizeQuestion:
       type: "object"
       properties:
+        id:
+          type: "string"
         label:
           type: "string"
           example: "お目当ての出演者を教えてください（必須）"
@@ -369,6 +601,9 @@ components:
           type: "array"
           items:
             type: "string"
+        metadata:
+          type: "object"
+          additionalProperties: true
 
     TicketType:
       type: "object"
@@ -387,42 +622,71 @@ components:
         detail:
           type: "string"
           example: "ドリンク代別700円込み/6歳以上チケット必要"
+        currency:
+          type: "string"
+          description: "Three-letter ISO 4217 currency code"
+          default: "JPY"
+          example: "JPY"
         price:
           type: "integer"
+          description: "Base ticket price"
           example: 4200
         fee:
           type: "integer"
+          description: "Handling fee"
           example: 340
+        totalPrice:
+          type: "integer"
+          description: "Combined price and fee"
+          example: 4540
         remainingRate:
           type: "number"
-          description: "Stock ratio (1 = remaining, 0 = sold out)"
+          description: "Stock ratio (1.0 = in stock, 0.0 = sold out)"
           example: 1.0
         isSoldOut:
           type: "boolean"
-          description: "Whether this ticket type is sold out"
+          description: "Whether this ticket type is currently sold out"
           example: false
         status:
           type: "string"
-          description: "Status string (applied, closed)"
+          description: "Status string from upstream (applied, closed, etc.)"
           example: "applied"
         maxNumPerApply:
           type: "integer"
-          description: "Maximum tickets per application"
+          description: "Maximum tickets allowed per application"
           example: 4
         prefix:
           type: "string"
-          description: "Ticket number prefix"
+          description: "Ticket reference number prefix (e.g. IA, IB, IHS)"
           example: "IA"
+        metadata:
+          type: "object"
+          additionalProperties: true
+          description: "Extensible vendor-specific ticket attributes"
 
     ErrorResponse:
       type: "object"
       required:
+        - "apiVersion"
         - "success"
         - "error"
       properties:
+        apiVersion:
+          type: "string"
+          example: "1.0"
         success:
           type: "boolean"
           example: false
+        code:
+          type: "string"
+          description: "Machine-readable error classification code"
+          example: "EVENT_NOT_FOUND"
         error:
           type: "string"
+          description: "Human-readable error description"
           example: "Event not found"
+        details:
+          type: "array"
+          items:
+            type: "string"
+          description: "Additional diagnostic information or validation errors"

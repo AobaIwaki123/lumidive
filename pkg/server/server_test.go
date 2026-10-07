@@ -177,3 +177,32 @@ func TestGetEventIcal(t *testing.T) {
 		t.Errorf("expected iCal format, got:\n%s", rec.Body.String())
 	}
 }
+
+func TestBatchParseEvents(t *testing.T) {
+	handler := setupTestServer()
+
+	body := []byte(`{"targets": ["plkt1022", "https://t-dv.com/tgg_1006"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/events/batch", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp api.BatchEventResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode json: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true")
+	}
+	if len(resp.Results) != 2 {
+		t.Fatalf("expected 2 batch results, got %d", len(resp.Results))
+	}
+	if !resp.Results[0].Success {
+		t.Errorf("expected result 0 to succeed")
+	}
+}
+
