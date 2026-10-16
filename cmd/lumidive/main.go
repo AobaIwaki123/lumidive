@@ -28,6 +28,8 @@ func main() {
 	switch command {
 	case "parse":
 		runParse(os.Args[2:])
+	case "candidate":
+		runCandidate(os.Args[2:])
 	case "ical":
 		runICal(os.Args[2:])
 	case "server":
@@ -47,6 +49,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  lumidive parse <url-or-id>     Parse and print event metadata in JSON")
+	fmt.Println("  lumidive candidate <url-or-id> Emit a lumi-spec event feed in JSON")
 	fmt.Println("  lumidive ical <url-or-id>      Generate and print iCalendar (.ics) format")
 	fmt.Println("  lumidive server [options]      Start the HTTP API server")
 	fmt.Println("  lumidive version               Show version")
@@ -54,6 +57,44 @@ func printUsage() {
 	fmt.Println("Server Options:")
 	fmt.Println("  --port <port>       Port to listen on (default: 8080 or $PORT)")
 	fmt.Println("  --cache-ttl <dur>   Cache duration (default: 60s)")
+}
+
+func runCandidate(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Error: missing event/artist URL or ID")
+		fmt.Fprintln(os.Stderr, "Usage: lumidive candidate <url-or-id>")
+		os.Exit(1)
+	}
+	target := args[0]
+	norm, err := ticketdive.NormalizeTarget(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	client := ticketdive.NewClient()
+	var payload any
+	if norm.Kind == ticketdive.KindArtist {
+		res, fetchErr := client.FetchArtist(context.Background(), target)
+		if fetchErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", fetchErr)
+			os.Exit(1)
+		}
+		payload = ticketdive.ToArtistEventFeed(res.Artist)
+	} else {
+		res, fetchErr := client.FetchEvent(context.Background(), target)
+		if fetchErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", fetchErr)
+			os.Exit(1)
+		}
+		payload = ticketdive.ToEventFeed(res.Event)
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(payload); err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func runParse(args []string) {
