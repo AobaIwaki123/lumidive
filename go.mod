@@ -3,6 +3,7 @@ module github.com/AobaIwaki123/lumidive
 go 1.23.0
 
 require (
+	github.com/AobaIwaki123/lumi-spec v0.1.2-0.20261016143410-9fc684ea55fc
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1
 	github.com/oapi-codegen/runtime v1.1.1
 	golang.org/x/sync v0.10.0

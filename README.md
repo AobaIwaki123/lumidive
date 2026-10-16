@@ -46,6 +46,10 @@ lumidive parse plkt1022
 # アーティスト情報＆出演予定イベント一覧を解析（JSON）
 lumidive parse https://ticketdive.com/artist/yoruami
 
+# lumi-spec event.feed.v1として出力（イベントまたはアーティスト）
+lumidive candidate plkt1022
+lumidive candidate https://ticketdive.com/artist/yoruami
+
 # iCalendar (.ics) データを標準出力（イベント単体 or アーティスト全公演）
 lumidive ical plkt1022 > event.ics
 lumidive ical https://ticketdive.com/artist/yoruami > artist.ics

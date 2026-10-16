@@ -183,6 +183,17 @@ func TestParseHTML(t *testing.T) {
 	if (*event.Images)[0] != "https://storage.googleapis.com/test-bucket/flyer.jpg" {
 		t.Errorf("image URL mismatch: %v", (*event.Images)[0])
 	}
+
+	candidate := ToEventCandidate(event)
+	if candidate.ID != "lumidive:event_id_001" || candidate.LocalDate != "2026-10-22" || candidate.Venue != "Test Arena" {
+		t.Fatalf("candidate = %#v", candidate)
+	}
+	if len(candidate.Performers) != 1 || candidate.Performers[0] != "Test Idol Group" {
+		t.Fatalf("candidate performers = %#v", candidate.Performers)
+	}
+	if len(candidate.Links) != 2 || candidate.Links[0].Kind != "ticket" {
+		t.Fatalf("candidate links = %#v", candidate.Links)
+	}
 }
 
 func TestGenerateICal(t *testing.T) {
